@@ -69,6 +69,12 @@ export default function Home() {
   const [address, setAddress] = useState("");
   const [notes,   setNotes]   = useState("");
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0, closed: false });
+  const [reviews, setReviews] = useState<{id: string, name: string, rating: number, comment: string, created_at: string}[]>([]);
+  const [reviewName,    setReviewName]    = useState("");
+  const [reviewRating,  setReviewRating]  = useState(0);
+  const [reviewComment, setReviewComment] = useState("");
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [reviewSubmitted,  setReviewSubmitted]  = useState(false);
   const [ordersOpen, setOrdersOpen] = useState(true);
   const [menuItems,  setMenuItems]  = useState<Record<string, boolean>>({
     menu_solo_shrimp: true, menu_solo_crab: true, menu_solo_mix: true,
@@ -90,7 +96,29 @@ export default function Home() {
       }
     }
     fetchSettings();
+    fetchReviews();
   }, []);
+
+  async function fetchReviews() {
+    const { data } = await supabase.from("reviews").select("*").eq("approved", true).order("created_at", { ascending: false });
+    if (data) setReviews(data);
+  }
+
+  async function submitReview() {
+    if (!reviewName.trim())    { alert("Please enter your name."); return; }
+    if (!reviewRating)         { alert("Please select a rating."); return; }
+    if (!reviewComment.trim()) { alert("Please write a comment."); return; }
+    setReviewSubmitting(true);
+    await supabase.from("reviews").insert({
+      name: reviewName.trim(),
+      rating: reviewRating,
+      comment: reviewComment.trim(),
+      approved: false,
+    });
+    setReviewSubmitting(false);
+    setReviewSubmitted(true);
+    setReviewName(""); setReviewRating(0); setReviewComment("");
+  }
 
   useEffect(() => {
     function getTimeLeft() {
@@ -794,6 +822,81 @@ export default function Home() {
             <p style={{ color: muted, fontSize: "12px", letterSpacing: "0.04em" }}>We will confirm via text to <strong>{phone}</strong> before Friday 8PM.</p>
           </section>
         )}
+
+        {/* REVIEWS SECTION */}
+        <section style={{ backgroundColor: cream, padding: "100px clamp(20px, 4vw, 48px)", borderTop: "1px solid rgba(196,149,42,0.2)" }}>
+          <div style={{ maxWidth: "800px", margin: "0 auto" }}>
+            <p style={{ fontFamily: "'Inter', sans-serif", fontSize: "10px", fontWeight: "700", letterSpacing: "0.22em", textTransform: "uppercase" as const, color: gold, marginBottom: "16px", textAlign: "center" as const }}>What People Say</p>
+            <h2 style={{ fontFamily: "'Cinzel', serif", fontSize: "clamp(32px, 5vw, 52px)", fontWeight: "600", color: black, textAlign: "center", marginBottom: "64px", lineHeight: 1.1 }}>Reviews</h2>
+
+            {/* Existing reviews */}
+            {reviews.length > 0 && (
+              <div style={{ display: "grid", gap: "16px", marginBottom: "64px" }}>
+                {reviews.map(review => (
+                  <div key={review.id} style={{ backgroundColor: white, border: "1px solid rgba(196,149,42,0.2)", borderRadius: "4px", padding: "24px 28px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "12px" }}>
+                      <div>
+                        <p style={{ fontFamily: "'Cinzel', serif", fontSize: "16px", color: black, marginBottom: "4px" }}>{review.name}</p>
+                        <div style={{ display: "flex", gap: "3px" }}>
+                          {[1,2,3,4,5].map(star => (
+                            <span key={star} style={{ color: star <= review.rating ? gold : "#E0D9CC", fontSize: "16px" }}>★</span>
+                          ))}
+                        </div>
+                      </div>
+                      <p style={{ fontSize: "11px", color: muted, letterSpacing: "0.04em" }}>
+                        {new Date(review.created_at).toLocaleDateString("en-TT", { month: "long", year: "numeric" })}
+                      </p>
+                    </div>
+                    <p style={{ fontSize: "14px", color: charcoal, lineHeight: 1.8, fontStyle: "italic" }}>&ldquo;{review.comment}&rdquo;</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {reviews.length === 0 && (
+              <div style={{ textAlign: "center" as const, marginBottom: "64px", padding: "40px", border: "1px solid rgba(196,149,42,0.2)", borderRadius: "4px" }}>
+                <p style={{ fontSize: "32px", marginBottom: "12px" }}>⭐</p>
+                <p style={{ fontFamily: "'Cinzel', serif", fontSize: "18px", color: black, marginBottom: "8px" }}>No reviews yet</p>
+                <p style={{ fontSize: "13px", color: muted }}>Be the first to leave a review!</p>
+              </div>
+            )}
+
+            {/* Review form */}
+            <div style={{ backgroundColor: white, border: "1px solid rgba(196,149,42,0.2)", borderRadius: "4px", padding: "32px" }}>
+              <h3 style={{ fontFamily: "'Cinzel', serif", fontSize: "22px", color: black, marginBottom: "24px" }}>Leave a Review</h3>
+              {reviewSubmitted ? (
+                <div style={{ textAlign: "center" as const, padding: "32px" }}>
+                  <p style={{ fontSize: "32px", marginBottom: "12px" }}>🙏</p>
+                  <p style={{ fontFamily: "'Cinzel', serif", fontSize: "18px", color: black, marginBottom: "8px" }}>Thank you!</p>
+                  <p style={{ fontSize: "13px", color: muted }}>Your review has been submitted and is awaiting approval.</p>
+                  <button onClick={() => setReviewSubmitted(false)} style={{ ...goldBtn, marginTop: "20px", padding: "12px 24px", fontSize: "12px" }}>Write Another</button>
+                </div>
+              ) : (
+                <div style={{ display: "grid", gap: "16px" }}>
+                  <div>
+                    <label style={{ fontFamily: "'Inter', sans-serif", fontSize: "10px", fontWeight: "700", letterSpacing: "0.14em", textTransform: "uppercase" as const, color: muted, display: "block", marginBottom: "8px" }}>Your Name *</label>
+                    <input type="text" value={reviewName} onChange={e => setReviewName(e.target.value)} placeholder="Jane Smith" style={inputStyle} />
+                  </div>
+                  <div>
+                    <label style={{ fontFamily: "'Inter', sans-serif", fontSize: "10px", fontWeight: "700", letterSpacing: "0.14em", textTransform: "uppercase" as const, color: muted, display: "block", marginBottom: "8px" }}>Rating *</label>
+                    <div style={{ display: "flex", gap: "8px" }}>
+                      {[1,2,3,4,5].map(star => (
+                        <button key={star} onClick={() => setReviewRating(star)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "32px", color: star <= reviewRating ? gold : "#E0D9CC", transition: "color 0.2s" }}>★</button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label style={{ fontFamily: "'Inter', sans-serif", fontSize: "10px", fontWeight: "700", letterSpacing: "0.14em", textTransform: "uppercase" as const, color: muted, display: "block", marginBottom: "8px" }}>Your Review *</label>
+                    <textarea value={reviewComment} onChange={e => setReviewComment(e.target.value)} placeholder="Tell us about your experience..." rows={4} style={{ ...inputStyle, resize: "vertical" }} />
+                  </div>
+                  <button onClick={submitReview} disabled={reviewSubmitting} style={{ ...goldBtn, padding: "14px", fontSize: "12px", opacity: reviewSubmitting ? 0.7 : 1 }}>
+                    {reviewSubmitting ? "Submitting..." : "Submit Review"}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
 
         {/* FIND US */}
         <section id="find-us" style={{ backgroundColor: black, padding: "100px clamp(20px, 4vw, 48px)" }}>

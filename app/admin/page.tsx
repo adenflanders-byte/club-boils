@@ -56,6 +56,7 @@ export default function AdminPage() {
   });
   const [settingsLoading, setSettingsLoading] = useState(false);
   const [settingsSaved,   setSettingsSaved]   = useState(false);
+  const [pendingReviews, setPendingReviews] = useState<{id: string, name: string, rating: number, comment: string, created_at: string}[]>([]);
 
   async function fetchSettings() {
     const { data } = await supabase.from("settings").select("*");
@@ -84,6 +85,21 @@ export default function AdminPage() {
     setTimeout(() => setSettingsSaved(false), 3000);
   }
 
+  async function fetchReviews() {
+    const { data } = await supabase.from("reviews").select("*").eq("approved", false).order("created_at", { ascending: false });
+    if (data) setPendingReviews(data);
+  }
+
+  async function approveReview(id: string) {
+    await supabase.from("reviews").update({ approved: true }).eq("id", id);
+    setPendingReviews(prev => prev.filter(r => r.id !== id));
+  }
+
+  async function deleteReview(id: string) {
+    await supabase.from("reviews").delete().eq("id", id);
+    setPendingReviews(prev => prev.filter(r => r.id !== id));
+  }
+
   async function fetchOrders() {
     setLoading(true);
     const { data, error } = await supabase
@@ -94,7 +110,7 @@ export default function AdminPage() {
     setLoading(false);
   }
 
-  useEffect(() => { if (authed) { fetchOrders(); fetchSettings(); } }, [authed]);
+  useEffect(() => { if (authed) { fetchOrders(); fetchSettings(); fetchReviews(); } }, [authed]);
 
   function handleLogin() {
     if (pwInput === PASSWORD) { setAuthed(true); setPwError(false); }
@@ -273,6 +289,44 @@ export default function AdminPage() {
           >
             {settingsLoading ? "Saving..." : settingsSaved ? "✅ Saved!" : "Save Settings"}
           </button>
+        </div>
+
+        {/* ── PENDING REVIEWS ── */}
+        <div style={{ backgroundColor: C.white, borderRadius: "4px", border: `1px solid ${C.border}`, padding: "24px", marginBottom: "24px" }}>
+          <p style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "0.1em", textTransform: "uppercase" as const, color: C.gold, marginBottom: "6px" }}>Reviews</p>
+          <h3 style={{ fontFamily: FONT_DISPLAY, fontSize: "20px", fontWeight: "400", color: C.black, marginBottom: "20px" }}>
+            Pending Approval {pendingReviews.length > 0 && <span style={{ backgroundColor: C.gold, color: C.white, borderRadius: "50%", width: "22px", height: "22px", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "12px", marginLeft: "8px" }}>{pendingReviews.length}</span>}
+          </h3>
+          {pendingReviews.length === 0 ? (
+            <p style={{ color: C.muted, fontSize: "14px" }}>No pending reviews</p>
+          ) : (
+            <div style={{ display: "grid", gap: "12px" }}>
+              {pendingReviews.map(review => (
+                <div key={review.id} style={{ border: `1px solid ${C.border}`, borderRadius: "4px", padding: "16px 20px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
+                    <div>
+                      <p style={{ fontWeight: "600", fontSize: "15px", color: C.black }}>{review.name}</p>
+                      <div style={{ display: "flex", gap: "2px", marginTop: "4px" }}>
+                        {[1,2,3,4,5].map(star => (
+                          <span key={star} style={{ color: star <= review.rating ? C.gold : C.border, fontSize: "14px" }}>★</span>
+                        ))}
+                      </div>
+                    </div>
+                    <p style={{ fontSize: "11px", color: C.muted }}>{new Date(review.created_at).toLocaleDateString()}</p>
+                  </div>
+                  <p style={{ fontSize: "13px", color: C.charcoal, lineHeight: 1.7, marginBottom: "16px", fontStyle: "italic" }}>&ldquo;{review.comment}&rdquo;</p>
+                  <div style={{ display: "flex", gap: "10px" }}>
+                    <button onClick={() => approveReview(review.id)} style={{ backgroundColor: "#1A7A3A", color: C.white, padding: "9px 20px", borderRadius: "4px", border: "none", fontFamily: FONT_BODY, fontWeight: "600", fontSize: "12px", cursor: "pointer" }}>
+                      ✅ Approve
+                    </button>
+                    <button onClick={() => deleteReview(review.id)} style={{ backgroundColor: C.white, color: "#C0392B", padding: "9px 20px", borderRadius: "4px", border: "1px solid #F5C6C6", fontFamily: FONT_BODY, fontWeight: "500", fontSize: "12px", cursor: "pointer" }}>
+                      🗑 Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* ── PROFIT CALCULATOR ── */}
