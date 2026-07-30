@@ -388,6 +388,9 @@ export default function AdminPage() {
           <span style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "0.12em", color: C.gold, textTransform: "uppercase" as const }}>Admin</span>
         </div>
         <div style={{ display: "flex", gap: "10px" }}>
+          <a href="/accounts" style={{ backgroundColor: "transparent", border: `1px solid ${C.gold}`, color: C.gold, padding: "7px 16px", borderRadius: "4px", fontSize: "12px", fontFamily: FONT_BODY, textDecoration: "none", display: "inline-flex", alignItems: "center" }}>
+            📊 Accounts
+          </a>
           <button onClick={fetchOrders} style={{ backgroundColor: "transparent", border: `1px solid ${C.gold}`, color: C.gold, padding: "7px 16px", borderRadius: "4px", cursor: "pointer", fontSize: "12px", fontFamily: FONT_BODY }}>
             ↻ Refresh
           </button>
