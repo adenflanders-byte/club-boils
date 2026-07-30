@@ -102,22 +102,17 @@ export default function AdminPage() {
     setPendingReviews(prev => prev.filter(r => r.id !== id));
   }
 
-  // Export orders + financials to PDF (print)
+  // Export ORDERS ONLY to PDF
   function exportToPDF() {
     const printWindow = window.open("", "_blank");
     if (!printWindow) return;
     const activeOrders = orders.filter(o => ["new","confirmed","ready"].includes(o.status));
-    const revenue  = activeOrders.reduce((s, o) => s + o.total, 0);
-    const exp      = Number(weeklyExpenditure) || 0;
-    const profit   = revenue - exp;
-    const margin   = revenue > 0 ? ((profit / revenue) * 100).toFixed(1) : "0";
-    const roi      = exp > 0 ? ((profit / exp) * 100).toFixed(1) : "N/A";
-    const isProfit = profit >= 0;
+    const revenue = activeOrders.reduce((s, o) => s + o.total, 0);
     const html = `
       <!DOCTYPE html>
       <html>
       <head>
-        <title>The Club Boils - Saturday Report</title>
+        <title>The Club Boils - Saturday Orders</title>
         <style>
           * { box-sizing: border-box; }
           body { font-family: Arial, sans-serif; padding: 24px; color: #1a1a1a; max-width: 800px; margin: 0 auto; }
@@ -125,14 +120,6 @@ export default function AdminPage() {
           .subtitle { color: #888; font-size: 13px; margin-bottom: 28px; }
           .divider { border: none; border-top: 2px solid #C4952A; margin: 20px 0; }
           .section-title { font-size: 13px; font-weight: bold; letter-spacing: 0.1em; text-transform: uppercase; color: #C4952A; margin-bottom: 12px; }
-          .finance-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px; }
-          .finance-card { border: 1px solid #ddd; border-radius: 6px; padding: 14px; text-align: center; }
-          .finance-card.profit { border-color: ${isProfit ? "#8FD4A0" : "#F5C6C6"}; background: ${isProfit ? "#EAFFF0" : "#FFECEC"}; }
-          .finance-label { font-size: 10px; font-weight: bold; letter-spacing: 0.1em; text-transform: uppercase; color: #888; margin-bottom: 6px; }
-          .finance-value { font-size: 22px; font-weight: bold; color: #1a1a1a; }
-          .finance-value.gold { color: #C4952A; }
-          .finance-value.green { color: #1A7A3A; }
-          .finance-value.red { color: #A03030; }
           .summary-bar { background: #f5f5f5; border-radius: 6px; padding: 14px 18px; margin-bottom: 24px; display: flex; gap: 24px; flex-wrap: wrap; }
           .summary-item { font-size: 13px; }
           .order { border: 1px solid #e0e0e0; border-radius: 6px; padding: 16px; margin-bottom: 12px; page-break-inside: avoid; }
@@ -148,39 +135,14 @@ export default function AdminPage() {
       </head>
       <body>
         <h1>♣ The Club Boils</h1>
-        <p class="subtitle">Saturday Business Report &nbsp;·&nbsp; ${new Date().toLocaleDateString("en-TT", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</p>
-
+        <p class="subtitle">Saturday Order List &nbsp;·&nbsp; ${new Date().toLocaleDateString("en-TT", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</p>
         <hr class="divider" />
-        <p class="section-title">Financial Summary</p>
-        <div class="finance-grid">
-          <div class="finance-card">
-            <div class="finance-label">Revenue</div>
-            <div class="finance-value gold">TT$${revenue}</div>
-          </div>
-          <div class="finance-card">
-            <div class="finance-label">Expenditure</div>
-            <div class="finance-value">${exp > 0 ? "TT$" + exp : "Not entered"}</div>
-          </div>
-          <div class="finance-card profit">
-            <div class="finance-label">Net Profit</div>
-            <div class="finance-value ${isProfit ? "green" : "red"}">${exp > 0 ? (isProfit ? "+" : "") + "TT$" + profit : "N/A"}</div>
-          </div>
-          <div class="finance-card">
-            <div class="finance-label">Profit Margin</div>
-            <div class="finance-value">${exp > 0 ? margin + "%" : "N/A"}</div>
-          </div>
-        </div>
-        ${exp > 0 ? `<p style="font-size:12px;color:#888;margin-bottom:20px;">Return on Cost: ${roi}% &nbsp;·&nbsp; Based on TT$${exp} expenditure entered</p>` : ""}
-
-        <hr class="divider" />
-        <p class="section-title">Order Summary</p>
         <div class="summary-bar">
           <div class="summary-item"><strong>${activeOrders.length}</strong> Total Orders</div>
           <div class="summary-item"><strong>${activeOrders.filter(o => o.fulfillment === "delivery").length}</strong> Deliveries</div>
           <div class="summary-item"><strong>${activeOrders.filter(o => o.fulfillment === "pickup").length}</strong> Pickups</div>
           <div class="summary-item"><strong>TT$${revenue}</strong> Total Revenue</div>
         </div>
-
         <hr class="divider" />
         <p class="section-title">Orders (${activeOrders.length})</p>
         ${activeOrders.map((o, i) => `
@@ -203,9 +165,88 @@ export default function AdminPage() {
             ${o.notes ? `<div class="notes-box">⚠️ ${o.notes}</div>` : ""}
           </div>
         `).join("")}
-
         <hr class="divider" />
         <p style="font-size:11px;color:#aaa;text-align:center;">The Club Boils &nbsp;·&nbsp; Arima, Trinidad &nbsp;·&nbsp; @theclub.boils</p>
+      </body>
+      </html>
+    `;
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.print();
+  }
+
+  // Export FINANCIALS ONLY to PDF
+  function exportFinancialsPDF() {
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+    const activeOrders = orders.filter(o => o.status !== "cancelled");
+    const revenue  = activeOrders.reduce((s, o) => s + o.total, 0);
+    const exp      = Number(weeklyExpenditure) || 0;
+    const profit   = revenue - exp;
+    const margin   = revenue > 0 ? ((profit / revenue) * 100).toFixed(1) : "0";
+    const roi      = exp > 0 ? ((profit / exp) * 100).toFixed(1) : "N/A";
+    const isProfit = profit >= 0;
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>The Club Boils - Financial Report</title>
+        <style>
+          * { box-sizing: border-box; }
+          body { font-family: Arial, sans-serif; padding: 32px; color: #1a1a1a; max-width: 600px; margin: 0 auto; }
+          h1 { font-size: 28px; margin-bottom: 2px; }
+          .subtitle { color: #888; font-size: 13px; margin-bottom: 32px; }
+          .divider { border: none; border-top: 2px solid #C4952A; margin: 24px 0; }
+          .section-title { font-size: 11px; font-weight: bold; letter-spacing: 0.14em; text-transform: uppercase; color: #C4952A; margin-bottom: 16px; }
+          .card { border: 1px solid #e0e0e0; border-radius: 8px; padding: 20px 24px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
+          .card.highlight { border-color: ${isProfit ? "#8FD4A0" : "#F5C6C6"}; background: ${isProfit ? "#EAFFF0" : "#FFECEC"}; }
+          .card-label { font-size: 12px; font-weight: bold; letter-spacing: 0.08em; text-transform: uppercase; color: #888; margin-bottom: 4px; }
+          .card-value { font-size: 28px; font-weight: bold; }
+          .gold { color: #C4952A; }
+          .green { color: #1A7A3A; }
+          .red { color: #A03030; }
+          .row { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f0f0f0; font-size: 14px; }
+          .row:last-child { border-bottom: none; }
+          .footer { text-align: center; font-size: 11px; color: #aaa; margin-top: 32px; }
+        </style>
+      </head>
+      <body>
+        <h1>♣ The Club Boils</h1>
+        <p class="subtitle">Financial Report &nbsp;·&nbsp; ${new Date().toLocaleDateString("en-TT", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</p>
+
+        <hr class="divider" />
+        <p class="section-title">Revenue & Costs</p>
+
+        <div class="card">
+          <div><div class="card-label">Total Revenue</div><div class="card-value gold">TT$${revenue}</div></div>
+          <div style="font-size:13px;color:#888;">${activeOrders.length} orders</div>
+        </div>
+
+        <div class="card">
+          <div><div class="card-label">Total Expenditure</div><div class="card-value">${exp > 0 ? "TT$" + exp : "Not entered"}</div></div>
+          <div style="font-size:13px;color:#888;">Weekly costs</div>
+        </div>
+
+        ${exp > 0 ? `
+        <div class="card highlight">
+          <div><div class="card-label">Net Profit</div><div class="card-value ${isProfit ? "green" : "red"}">${isProfit ? "+" : ""}TT$${profit}</div></div>
+          <div style="font-size:13px;color:#888;">${isProfit ? "Profit" : "Loss"}</div>
+        </div>
+        ` : ""}
+
+        <hr class="divider" />
+        <p class="section-title">Performance Metrics</p>
+
+        <div class="row"><span>Profit Margin</span><strong>${exp > 0 ? margin + "%" : "N/A"}</strong></div>
+        <div class="row"><span>Return on Cost</span><strong>${exp > 0 ? roi + "%" : "N/A"}</strong></div>
+        <div class="row"><span>Average Order Value</span><strong>${activeOrders.length > 0 ? "TT$" + (revenue / activeOrders.length).toFixed(0) : "N/A"}</strong></div>
+        <div class="row"><span>Total Orders</span><strong>${activeOrders.length}</strong></div>
+        <div class="row"><span>Deliveries</span><strong>${activeOrders.filter(o => o.fulfillment === "delivery").length}</strong></div>
+        <div class="row"><span>Pickups</span><strong>${activeOrders.filter(o => o.fulfillment === "pickup").length}</strong></div>
+        <div class="row"><span>Delivery Revenue</span><strong>TT$${activeOrders.filter(o => o.fulfillment === "delivery").reduce((s, o) => s + o.total, 0)}</strong></div>
+        <div class="row"><span>Pickup Revenue</span><strong>TT$${activeOrders.filter(o => o.fulfillment === "pickup").reduce((s, o) => s + o.total, 0)}</strong></div>
+
+        <div class="footer">The Club Boils &nbsp;·&nbsp; Arima, Trinidad &nbsp;·&nbsp; @theclub.boils</div>
       </body>
       </html>
     `;
@@ -525,7 +566,10 @@ export default function AdminPage() {
           <h3 style={{ fontFamily: FONT_DISPLAY, fontSize: "20px", fontWeight: "400", color: C.black, marginBottom: "20px" }}>Quick Actions</h3>
           <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" as const }}>
             <button onClick={exportToPDF} style={{ backgroundColor: C.black, color: C.white, padding: "12px 24px", borderRadius: "4px", border: "none", fontFamily: FONT_BODY, fontWeight: "600", fontSize: "13px", cursor: "pointer", display: "flex", alignItems: "center", gap: "8px" }}>
-              🖨️ Print Saturday Orders
+              🖨️ Print Orders
+            </button>
+            <button onClick={exportFinancialsPDF} style={{ backgroundColor: C.gold, color: C.white, padding: "12px 24px", borderRadius: "4px", border: "none", fontFamily: FONT_BODY, fontWeight: "600", fontSize: "13px", cursor: "pointer", display: "flex", alignItems: "center", gap: "8px" }}>
+              📊 Print Financial Report
             </button>
             <button onClick={markAllComplete} disabled={markingComplete} style={{ backgroundColor: "#1A7A3A", color: C.white, padding: "12px 24px", borderRadius: "4px", border: "none", fontFamily: FONT_BODY, fontWeight: "600", fontSize: "13px", cursor: "pointer", opacity: markingComplete ? 0.7 : 1 }}>
               {markingComplete ? "Completing..." : "✅ Mark All Complete"}
