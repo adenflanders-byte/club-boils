@@ -45,6 +45,8 @@ export default function AdminPage() {
   const [filter,    setFilter]   = useState<OrderStatus | "all">("all");
   const [expanded,  setExpanded] = useState<string | null>(null);
   const [weeklyExpenditure, setWeeklyExpenditure] = useState<string>("");
+  const [revenueHistory, setRevenueHistory] = useState<{week: string, revenue: number, orders: number}[]>([]);
+  const [markingComplete, setMarkingComplete] = useState(false);
   const [search,    setSearch]   = useState("");
 
   // Settings
@@ -100,6 +102,83 @@ export default function AdminPage() {
     setPendingReviews(prev => prev.filter(r => r.id !== id));
   }
 
+  // Export orders to PDF (print)
+  function exportToPDF() {
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+    const activeOrders = orders.filter(o => ["new","confirmed","ready"].includes(o.status));
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>The Club Boils - Saturday Orders</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 20px; color: #1a1a1a; }
+          h1 { font-size: 24px; margin-bottom: 4px; }
+          .subtitle { color: #666; font-size: 14px; margin-bottom: 24px; }
+          .order { border: 1px solid #ddd; border-radius: 6px; padding: 16px; margin-bottom: 16px; page-break-inside: avoid; }
+          .order-header { display: flex; justify-content: space-between; margin-bottom: 8px; }
+          .name { font-size: 18px; font-weight: bold; }
+          .total { font-size: 18px; font-weight: bold; color: #B8922A; }
+          .badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: bold; margin-bottom: 8px; }
+          .details { font-size: 13px; color: #444; margin: 4px 0; }
+          .notes { background: #fff8e6; border: 1px solid #f0c040; border-radius: 4px; padding: 8px; font-size: 12px; margin-top: 8px; }
+          .summary { background: #f5f5f5; padding: 16px; border-radius: 6px; margin-bottom: 24px; }
+          @media print { body { padding: 10px; } }
+        </style>
+      </head>
+      <body>
+        <h1>The Club Boils</h1>
+        <p class="subtitle">Saturday Order List — Printed: ${new Date().toLocaleString("en-TT")}</p>
+        <div class="summary">
+          <strong>Total Active Orders: ${activeOrders.length}</strong> &nbsp;&nbsp;
+          <strong>Total Revenue: TT$${activeOrders.reduce((s, o) => s + o.total, 0)}</strong> &nbsp;&nbsp;
+          <strong>Deliveries: ${activeOrders.filter(o => o.fulfillment === "delivery").length}</strong> &nbsp;&nbsp;
+          <strong>Pickups: ${activeOrders.filter(o => o.fulfillment === "pickup").length}</strong>
+        </div>
+        ${activeOrders.map((o, i) => `
+          <div class="order">
+            <div class="order-header">
+              <div>
+                <div class="name">${i + 1}. ${o.name}</div>
+                <div class="details">📞 ${o.phone}</div>
+              </div>
+              <div class="total">TT$${o.total}</div>
+            </div>
+            <div class="details"><strong>Package:</strong> ${o.package}</div>
+            ${(o.details || []).map(d => `<div class="details">· ${d}</div>`).join("")}
+            <div class="details">${o.fulfillment === "delivery" ? `🚗 Delivery: ${o.address}` : "🏠 Pickup"}</div>
+            ${o.notes ? `<div class="notes">⚠️ ${o.notes}</div>` : ""}
+          </div>
+        `).join("")}
+      </body>
+      </html>
+    `;
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.print();
+  }
+
+  // Mark all active orders as completed
+  async function markAllComplete() {
+    const confirmed = window.confirm("Mark all active orders as completed? This cannot be undone.");
+    if (!confirmed) return;
+    setMarkingComplete(true);
+    const activeIds = orders.filter(o => ["new","confirmed","ready"].includes(o.status)).map(o => o.id);
+    for (const id of activeIds) {
+      await supabase.from("orders").update({ status: "completed" }).eq("id", id);
+    }
+    setOrders(prev => prev.map(o => activeIds.includes(o.id) ? { ...o, status: "completed" as OrderStatus } : o));
+    setMarkingComplete(false);
+
+    // Save revenue history
+    const weekRevenue = orders.filter(o => activeIds.includes(o.id)).reduce((s, o) => s + o.total, 0);
+    const weekLabel = new Date().toLocaleDateString("en-TT", { month: "short", day: "numeric", year: "numeric" });
+    const newEntry = { week: weekLabel, revenue: weekRevenue, orders: activeIds.length };
+    setRevenueHistory(prev => [newEntry, ...prev.slice(0, 11)]);
+    localStorage.setItem("revenue_history", JSON.stringify([newEntry, ...revenueHistory.slice(0, 11)]));
+  }
+
   async function fetchOrders() {
     setLoading(true);
     const { data, error } = await supabase
@@ -110,7 +189,15 @@ export default function AdminPage() {
     setLoading(false);
   }
 
-  useEffect(() => { if (authed) { fetchOrders(); fetchSettings(); fetchReviews(); } }, [authed]);
+  useEffect(() => {
+    if (authed) {
+      fetchOrders();
+      fetchSettings();
+      fetchReviews();
+      const saved = localStorage.getItem("revenue_history");
+      if (saved) setRevenueHistory(JSON.parse(saved));
+    }
+  }, [authed]);
 
   function handleLogin() {
     if (pwInput === PASSWORD) { setAuthed(true); setPwError(false); }
@@ -376,6 +463,42 @@ export default function AdminPage() {
             );
           })()}
         </div>
+
+        {/* ── ADMIN TOOLS ── */}
+        <div style={{ backgroundColor: C.white, borderRadius: "4px", border: `1px solid ${C.border}`, padding: "24px", marginBottom: "24px" }}>
+          <p style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "0.1em", textTransform: "uppercase" as const, color: C.gold, marginBottom: "6px" }}>Admin Tools</p>
+          <h3 style={{ fontFamily: FONT_DISPLAY, fontSize: "20px", fontWeight: "400", color: C.black, marginBottom: "20px" }}>Quick Actions</h3>
+          <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" as const }}>
+            <button onClick={exportToPDF} style={{ backgroundColor: C.black, color: C.white, padding: "12px 24px", borderRadius: "4px", border: "none", fontFamily: FONT_BODY, fontWeight: "600", fontSize: "13px", cursor: "pointer", display: "flex", alignItems: "center", gap: "8px" }}>
+              🖨️ Print Saturday Orders
+            </button>
+            <button onClick={markAllComplete} disabled={markingComplete} style={{ backgroundColor: "#1A7A3A", color: C.white, padding: "12px 24px", borderRadius: "4px", border: "none", fontFamily: FONT_BODY, fontWeight: "600", fontSize: "13px", cursor: "pointer", opacity: markingComplete ? 0.7 : 1 }}>
+              {markingComplete ? "Completing..." : "✅ Mark All Complete"}
+            </button>
+            <button onClick={fetchOrders} style={{ backgroundColor: C.white, color: C.charcoal, padding: "12px 24px", borderRadius: "4px", border: `1px solid ${C.border}`, fontFamily: FONT_BODY, fontWeight: "600", fontSize: "13px", cursor: "pointer" }}>
+              ↻ Refresh Orders
+            </button>
+          </div>
+        </div>
+
+        {/* ── REVENUE HISTORY ── */}
+        {revenueHistory.length > 0 && (
+          <div style={{ backgroundColor: C.white, borderRadius: "4px", border: `1px solid ${C.border}`, padding: "24px", marginBottom: "24px" }}>
+            <p style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "0.1em", textTransform: "uppercase" as const, color: C.gold, marginBottom: "6px" }}>History</p>
+            <h3 style={{ fontFamily: FONT_DISPLAY, fontSize: "20px", fontWeight: "400", color: C.black, marginBottom: "20px" }}>Weekly Revenue</h3>
+            <div style={{ display: "grid", gap: "8px" }}>
+              {revenueHistory.map((entry, i) => (
+                <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", backgroundColor: i === 0 ? "#EAFFF0" : C.cream, borderRadius: "4px", border: `1px solid ${i === 0 ? "#8FD4A0" : C.border}` }}>
+                  <div>
+                    <p style={{ fontWeight: "600", fontSize: "14px", color: C.black }}>{entry.week}</p>
+                    <p style={{ fontSize: "12px", color: C.muted, marginTop: "2px" }}>{entry.orders} order{entry.orders !== 1 ? "s" : ""}</p>
+                  </div>
+                  <p style={{ fontFamily: FONT_DISPLAY, fontSize: "20px", color: i === 0 ? "#1A7A3A" : C.black }}>TT${entry.revenue}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Search */}
         <div style={{ marginBottom: "16px" }}>
