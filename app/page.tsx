@@ -44,6 +44,7 @@ const SIMPLE_ITEMS = [
   { id: "ramen", name: "Shrimp Alfredo Ramen Boil", desc: "Shrimp, ramen noodles, homemade Alfredo sauce, sausage, boiled egg & corn", price: 100, image: "/ramen2.jpeg", tag: "Fan Favourite" },
   { id: "wings", name: "Wings Boil", desc: "6-8 wings tossed in our signature specialty butter sauce", price: 80, image: "/wings2.jpeg", tag: null },
   { id: "sauce", name: "House Sauce", desc: "Homemade Lime Pepper Sauce", price: 10, image: null, tag: null },
+  { id: "combo", name: "Club Ramen Wings Combo", desc: "Shrimp Alfredo Ramen Boil + Wings Boil — the ultimate combo", price: 120, image: "/wings2.jpeg", tag: "New" },
 ];
 
 const BASE = 60;
@@ -79,7 +80,7 @@ export default function Home() {
   const [menuItems,  setMenuItems]  = useState<Record<string, boolean>>({
     menu_solo_shrimp: true, menu_solo_crab: true, menu_solo_mix: true,
     menu_duo_shrimp: true,  menu_duo_crab: true,  menu_duo_mix: true,
-    menu_ramen: true, menu_wings: true, menu_sauce: true, menu_build: true,
+    menu_ramen: true, menu_wings: true, menu_sauce: true, menu_build: true, menu_combo: true,
   });
   const [visibleSections, setVisibleSections] = useState<Set<string>>(new Set());
   const [tiltStyle, setTiltStyle] = useState<Record<string, React.CSSProperties>>({});
@@ -470,7 +471,7 @@ export default function Home() {
             <h1 style={{ fontFamily: "'Cinzel', serif", fontSize: "clamp(48px, 9vw, 100px)", fontWeight: "700", color: white, lineHeight: 0.95, margin: "0 0 12px", letterSpacing: "-0.01em" }}>
               FRESH
             </h1>
-            <h1 style={{ fontFamily: "'Cinzel', serif", fontSize: "clamp(48px, 9vw, 100px)", fontWeight: "400", color: "transparent", WebkitTextStroke: `1px ${gold}`, lineHeight: 0.95, margin: "0 0 32px", letterSpacing: "-0.01em" }}>
+            <h1 style={{ fontFamily: "'Cinzel', serif", fontSize: "clamp(48px, 9vw, 100px)", fontWeight: "400", color: "#FFFFFF", WebkitTextStroke: `1px ${gold}`, lineHeight: 0.95, margin: "0 0 32px", letterSpacing: "-0.01em" }}>
               SEAFOOD
             </h1>
             <p style={{ fontSize: "clamp(13px, 2vw, 16px)", color: "rgba(255,255,255,0.65)", maxWidth: "440px", margin: "0 auto 48px", lineHeight: 1.9, fontWeight: "300", letterSpacing: "0.02em" }}>
@@ -952,3 +953,4 @@ export default function Home() {
     </>
   );
 }
+ 
