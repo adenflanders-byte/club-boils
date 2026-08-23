@@ -90,7 +90,7 @@ export default function Home() {
   const [email,   setEmail]   = useState("");
   const [address, setAddress] = useState("");
   const [notes,   setNotes]   = useState("");
-  const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0, closed: false });
+  const [timeLeft, setTimeLeft] = useState<any>({ days: 0, hours: 0, minutes: 0, seconds: 0, closed: false, orderDay: "", cutoffDay: "" });
   const [reviews, setReviews] = useState<{id: string, name: string, rating: number, comment: string, created_at: string}[]>([]);
   const [reviewName,    setReviewName]    = useState("");
   const [reviewRating,  setReviewRating]  = useState(0);
@@ -159,28 +159,57 @@ export default function Home() {
   }
 
   useEffect(() => {
-    function getTimeLeft() {
+    function getNextOrderInfo() {
       const now = new Date();
-      const target = new Date();
-      const day = target.getDay();
-      const daysUntilFriday = (5 - day + 7) % 7;
-      target.setDate(target.getDate() + daysUntilFriday);
-      target.setHours(20, 0, 0, 0);
-      if (now >= target) target.setDate(target.getDate() + 7);
-      const diff = target.getTime() - now.getTime();
-      if (diff <= 0) return { days: 0, hours: 0, minutes: 0, seconds: 0, closed: true };
-      return {
-        days:    Math.floor(diff / (1000 * 60 * 60 * 24)),
-        hours:   Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
-        minutes: Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60)),
-        seconds: Math.floor((diff % (1000 * 60)) / 1000),
-        closed: false,
-      };
+      // Day schedule: cutoff night before at 8PM
+      // Thursday orders close Wednesday 8PM (day 3)
+      // Friday orders close Thursday 8PM (day 4)
+      // Saturday orders close Friday 8PM (day 5)
+      const schedule = [
+        { orderDay: "Thursday", cutoffDay: 3, label: "Thursday" },
+        { orderDay: "Friday",   cutoffDay: 4, label: "Friday"   },
+        { orderDay: "Saturday", cutoffDay: 5, label: "Saturday" },
+      ];
+
+      // Filter to only open days
+      const activeDays = schedule.filter(s => {
+        const key = s.orderDay.toLowerCase() as keyof typeof openDays;
+        return openDays[key];
+      });
+
+      if (activeDays.length === 0) {
+        return { days: 0, hours: 0, minutes: 0, seconds: 0, closed: true, orderDay: "", cutoffDay: "" };
+      }
+
+      // Find next available cutoff
+      for (let week = 0; week < 2; week++) {
+        for (const slot of activeDays) {
+          const target = new Date();
+          const currentDay = target.getDay();
+          let diff = slot.cutoffDay - currentDay + (week * 7);
+          if (diff < 0) diff += 7;
+          target.setDate(target.getDate() + diff);
+          target.setHours(20, 0, 0, 0);
+          if (target > now) {
+            const ms = target.getTime() - now.getTime();
+            return {
+              days:    Math.floor(ms / (1000 * 60 * 60 * 24)),
+              hours:   Math.floor((ms % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
+              minutes: Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60)),
+              seconds: Math.floor((ms % (1000 * 60)) / 1000),
+              closed: false,
+              orderDay: slot.orderDay,
+              cutoffDay: slot.label,
+            };
+          }
+        }
+      }
+      return { days: 0, hours: 0, minutes: 0, seconds: 0, closed: true, orderDay: "", cutoffDay: "" };
     }
-    setTimeLeft(getTimeLeft());
-    const interval = setInterval(() => setTimeLeft(getTimeLeft()), 1000);
+    setTimeLeft(getNextOrderInfo() as any);
+    const interval = setInterval(() => setTimeLeft(getNextOrderInfo() as any), 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [openDays]);
 
   // Scroll-triggered animations
   useEffect(() => {
@@ -568,29 +597,48 @@ export default function Home() {
           ))}
         </section>
 
-        {/* SATURDAY COUNTDOWN SECTION */}
+        {/* ORDER COUNTDOWN SECTION */}
         <section style={{ backgroundColor: black, padding: "80px clamp(20px, 4vw, 48px)", textAlign: "center" as const, borderBottom: `1px solid ${border}` }}>
           <div data-animate id="countdown-section" style={fadeIn("countdown-section")}>
             <p style={{ fontFamily: "'Inter', sans-serif", fontSize: "10px", fontWeight: "700", letterSpacing: "0.22em", textTransform: "uppercase" as const, color: gold, marginBottom: "20px" }}>Weekly Pre-Order</p>
-            <h2 style={{ fontFamily: "'Cinzel', serif", fontSize: "clamp(32px, 5vw, 56px)", fontWeight: "600", color: white, marginBottom: "16px", lineHeight: 1.1 }}>Open on Saturdays Only</h2>
+            <h2 style={{ fontFamily: "'Cinzel', serif", fontSize: "clamp(32px, 5vw, 56px)", fontWeight: "600", color: white, marginBottom: "16px", lineHeight: 1.1 }}>
+              {timeLeft.closed ? "Orders Are Currently Closed" : `Order for ${timeLeft.orderDay}`}
+            </h2>
             <p style={{ color: "rgba(255,255,255,0.4)", fontSize: "14px", maxWidth: "440px", margin: "0 auto 48px", lineHeight: 1.8, fontWeight: "300" }}>
-              One day. All the flavour. Made fresh, just for you.<br />
-              Limited slots — first come, first served.
+              Fresh seafood made just for you. Limited slots — first come, first served.
             </p>
 
+            {/* Open days pills */}
+            <div style={{ display: "flex", gap: "8px", justifyContent: "center", marginBottom: "40px", flexWrap: "wrap" as const }}>
+              {[
+                { key: "thursday", label: "Thursday" },
+                { key: "friday",   label: "Friday"   },
+                { key: "saturday", label: "Saturday"  },
+              ].map(d => (
+                <span key={d.key} style={{
+                  padding: "6px 16px", borderRadius: "20px", fontSize: "11px", fontWeight: "700", letterSpacing: "0.08em",
+                  backgroundColor: openDays[d.key as keyof typeof openDays] ? "rgba(196,149,42,0.2)" : "rgba(255,255,255,0.05)",
+                  color: openDays[d.key as keyof typeof openDays] ? gold : "rgba(255,255,255,0.2)",
+                  border: openDays[d.key as keyof typeof openDays] ? `1px solid ${gold}` : "1px solid rgba(255,255,255,0.1)",
+                }}>
+                  {d.label} {openDays[d.key as keyof typeof openDays] ? "✓" : "Closed"}
+                </span>
+              ))}
+            </div>
+
             {/* Countdown */}
-            <div style={{ marginBottom: "48px" }}>
-              <p style={{ fontSize: "10px", fontWeight: "700", letterSpacing: "0.18em", textTransform: "uppercase" as const, color: gold, marginBottom: "24px" }}>
-                {timeLeft.closed ? "Orders Are Now Closed" : "Orders Close Friday at 8PM"}
-              </p>
-              {!timeLeft.closed && (
+            {!timeLeft.closed ? (
+              <div style={{ marginBottom: "48px" }}>
+                <p style={{ fontSize: "10px", fontWeight: "700", letterSpacing: "0.18em", textTransform: "uppercase" as const, color: gold, marginBottom: "24px" }}>
+                  Orders for {timeLeft.orderDay} close {timeLeft.cutoffDay === timeLeft.orderDay ? "the night before" : `${timeLeft.cutoffDay} night`} at 8PM
+                </p>
                 <div style={{ display: "flex", gap: "clamp(8px, 2vw, 20px)", justifyContent: "center", flexWrap: "wrap" as const }}>
                   {[
                     { value: timeLeft.days,    label: "Days"    },
                     { value: timeLeft.hours,   label: "Hours"   },
                     { value: timeLeft.minutes, label: "Minutes" },
                     { value: timeLeft.seconds, label: "Seconds" },
-                  ].map((unit, i) => (
+                  ].map(unit => (
                     <div key={unit.label} style={{ textAlign: "center" as const, minWidth: "80px" }}>
                       <div style={{ border: `1px solid ${border}`, borderRadius: "4px", padding: "20px 16px", marginBottom: "8px", background: "rgba(196,149,42,0.05)" }}>
                         <p style={{ fontFamily: "'Cinzel', serif", fontSize: "clamp(28px, 5vw, 44px)", color: white, lineHeight: 1, fontWeight: "600" }}>
@@ -601,9 +649,15 @@ export default function Home() {
                     </div>
                   ))}
                 </div>
-              )}
-            </div>
-            <button onClick={revealMenu} style={goldBtn} className="gold-btn">Order for This Saturday</button>
+              </div>
+            ) : (
+              <div style={{ marginBottom: "48px", padding: "24px", border: `1px solid ${border}`, borderRadius: "4px", display: "inline-block" }}>
+                <p style={{ color: "rgba(255,255,255,0.4)", fontSize: "14px" }}>Check back soon — we open weekly!</p>
+              </div>
+            )}
+            <button onClick={revealMenu} style={goldBtn} className="gold-btn">
+              {timeLeft.closed ? "Browse the Menu" : `Order for ${timeLeft.orderDay}`}
+            </button>
           </div>
         </section>
 
