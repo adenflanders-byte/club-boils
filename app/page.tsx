@@ -19,11 +19,24 @@ const SEAFOOD = [
   { id: "squid",   emoji: "🐙", label: "Squid & Octopus", desc: "Portion",             price: 20 },
   { id: "clams",   emoji: "🐌", label: "Clams",           desc: "Portion",             price: 10 },
 ];
+const DUO_SEAFOOD = [
+  { id: "shrimp",  emoji: "🦐", label: "Shrimp",         desc: "12 shrimp",           price: 60  },
+  { id: "crab",    emoji: "🦀", label: "Snow Crab",       desc: "2 portions",          price: 100 },
+  { id: "mussels", emoji: "🐚", label: "Mussels",         desc: "Portion",             price: 20  },
+  { id: "squid",   emoji: "🐙", label: "Squid & Octopus", desc: "Portion",             price: 40  },
+  { id: "clams",   emoji: "🐌", label: "Clams",           desc: "Portion",             price: 20  },
+];
 const EXTRAS = [
   { id: "eggs",     emoji: "🥚", label: "Eggs",           desc: "2 pieces", price: 5  },
   { id: "sausage",  emoji: "🌭", label: "Sausage",        desc: "Portion",  price: 10 },
   { id: "corn",     emoji: "🌽", label: "Extra Corn",     desc: "Portion",  price: 5  },
   { id: "potatoes", emoji: "🥔", label: "Extra Potatoes", desc: "Portion",  price: 5  },
+];
+const DUO_EXTRAS = [
+  { id: "eggs",     emoji: "🥚", label: "Eggs",           desc: "2 pieces", price: 10 },
+  { id: "sausage",  emoji: "🌭", label: "Sausage",        desc: "Portion",  price: 20 },
+  { id: "corn",     emoji: "🌽", label: "Extra Corn",     desc: "Portion",  price: 10 },
+  { id: "potatoes", emoji: "🥔", label: "Extra Potatoes", desc: "Portion",  price: 10 },
 ];
 const HEATS = [
   { id: "mild",   label: "Mild",   emoji: "😊" },
@@ -59,7 +72,11 @@ export default function Home() {
   const [submitted,   setSubmitted]   = useState(false);
   const [submitting,  setSubmitting]  = useState(false);
   const [submitError, setSubmitError] = useState("");
-  const [showBuild,   setShowBuild]   = useState(false);
+  const [showBuild,    setShowBuild]    = useState(false);
+  const [showDuoBuild, setShowDuoBuild] = useState(false);
+  const [duoBuildSeafood, setDuoBuildSeafood] = useState<string[]>([]);
+  const [duoBuildExtras,  setDuoBuildExtras]  = useState<string[]>([]);
+  const [duoBuildHeat,    setDuoBuildHeat]    = useState<Heat>("");
   const [buildSeafood, setBuildSeafood] = useState<string[]>([]);
   const [buildExtras,  setBuildExtras]  = useState<string[]>([]);
   const [buildHeat,    setBuildHeat]    = useState<Heat>("");
@@ -208,7 +225,28 @@ export default function Home() {
       + e.reduce((sum, id) => sum + (EXTRAS.find(x => x.id === id)?.price ?? 0), 0);
   }
   function toggleBuildSeafood(id: string) { setBuildSeafood(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]); }
+  function toggleDuoBuildSeafood(id: string) { setDuoBuildSeafood(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]); }
+  function toggleDuoBuildExtra(id: string)   { setDuoBuildExtras(prev  => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]); }
   function toggleBuildExtra(id: string)   { setBuildExtras(prev  => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]); }
+  const DUO_BASE = 100;
+
+  function calcDuoBuildPrice(s: string[], e: string[]) {
+    return DUO_BASE
+      + s.reduce((sum, id) => sum + (DUO_SEAFOOD.find(x => x.id === id)?.price ?? 0), 0)
+      + e.reduce((sum, id) => sum + (DUO_EXTRAS.find(x  => x.id === id)?.price ?? 0), 0);
+  }
+
+  function addDuoBuildToCart() {
+    if (duoBuildSeafood.length === 0) { alert("Please pick at least one seafood item."); return; }
+    if (!duoBuildHeat) { alert("Please choose a heat level."); return; }
+    const seafoodLabels = duoBuildSeafood.map(id => DUO_SEAFOOD.find(x => x.id === id)?.label).join(", ");
+    const extraLabels   = duoBuildExtras.map(id  => DUO_EXTRAS.find(x  => x.id === id)?.label).join(", ");
+    const heatLabel     = HEATS.find(h => h.id === duoBuildHeat)?.label ?? "";
+    const desc = `${seafoodLabels}${extraLabels ? ` + ${extraLabels}` : ""} - ${heatLabel} (Duo)`;
+    addToCart({ id: `duo-build-${Date.now()}`, name: "Build Your Own Boil (Duo)", description: desc, price: calcDuoBuildPrice(duoBuildSeafood, duoBuildExtras) });
+    setDuoBuildSeafood([]); setDuoBuildExtras([]); setDuoBuildHeat(""); setShowDuoBuild(false);
+  }
+
   function addBuildToCart() {
     if (buildSeafood.length === 0) { alert("Please pick at least one seafood item."); return; }
     if (!buildHeat) { alert("Please choose a heat level."); return; }
@@ -579,7 +617,7 @@ export default function Home() {
                         <div style={{ position: "absolute", top: "12px", left: "12px", backgroundColor: gold, padding: "4px 10px", borderRadius: "1px" }}>
                           <p style={{ fontFamily: "'Inter', sans-serif", fontSize: "9px", fontWeight: "800", letterSpacing: "0.12em", color: black, textTransform: "uppercase" as const }}>{opt.label}</p>
                         </div>
-                        {favItems[`fav_${opt.id.replace(/-/g, "_")}`] && (
+                        {favItems[`fav_${opt.id.replace("-", "_")}`] && (
                           <div style={{ position: "absolute", top: "12px", right: "12px", backgroundColor: "#FFD700", padding: "4px 10px", borderRadius: "1px" }}>
                             <p style={{ fontFamily: "'Inter', sans-serif", fontSize: "9px", fontWeight: "800", letterSpacing: "0.1em", color: black, textTransform: "uppercase" as const }}>⭐ Fan Fav</p>
                           </div>
@@ -616,7 +654,7 @@ export default function Home() {
                         <div style={{ position: "absolute", top: "12px", left: "12px", backgroundColor: gold, padding: "4px 10px", borderRadius: "1px" }}>
                           <p style={{ fontFamily: "'Inter', sans-serif", fontSize: "9px", fontWeight: "800", letterSpacing: "0.12em", color: black, textTransform: "uppercase" as const }}>{opt.label}</p>
                         </div>
-                        {favItems[`fav_${opt.id.replace(/-/g, "_")}`] && (
+                        {favItems[`fav_${opt.id.replace("-", "_")}`] && (
                           <div style={{ position: "absolute", top: "12px", right: "12px", backgroundColor: "#FFD700", padding: "4px 10px", borderRadius: "1px" }}>
                             <p style={{ fontFamily: "'Inter', sans-serif", fontSize: "9px", fontWeight: "800", letterSpacing: "0.1em", color: black, textTransform: "uppercase" as const }}>⭐ Fan Fav</p>
                           </div>
@@ -738,6 +776,89 @@ export default function Home() {
               </div>
             )}
 
+            {/* Duo Build Your Own */}
+            {buildEnabled && (
+              <div style={{ maxWidth: "1000px", margin: "0 auto 40px" }}>
+                <div style={{ display: "flex", alignItems: "baseline", gap: "16px", marginBottom: "32px", borderBottom: `1px solid ${border}`, paddingBottom: "16px" }}>
+                  <h3 style={{ fontFamily: "'Cinzel', serif", fontSize: "clamp(22px, 3vw, 32px)", fontWeight: "600", color: black }}>Build Your Own Boil (Duo)</h3>
+                  <p style={{ fontSize: "12px", color: muted, letterSpacing: "0.06em" }}>Ideal for 2 · From TT$120</p>
+                </div>
+                <div style={{ backgroundColor: white, border: `1px solid ${border}`, borderRadius: "4px", overflow: "hidden" }}>
+                  <div style={{ position: "relative", height: "240px", overflow: "hidden" }}>
+                    <img src="/spread2.jpeg" alt="Build Your Own Boil Duo" style={{ width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }} />
+                    <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to right, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.3) 100%)", pointerEvents: "none" }} />
+                    <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", padding: "40px" }}>
+                      <div>
+                        <p style={{ fontSize: "10px", fontWeight: "700", letterSpacing: "0.2em", color: gold, textTransform: "uppercase" as const, marginBottom: "12px" }}>Double the Flavour. Double the Fun.</p>
+                        <h4 style={{ fontFamily: "'Cinzel', serif", fontSize: "clamp(24px, 3vw, 36px)", color: white, marginBottom: "16px", lineHeight: 1.1 }}>Build Your Own Boil (Duo)</h4>
+                        <button onClick={() => setShowDuoBuild(!showDuoBuild)} style={goldBtn} className="gold-btn">
+                          {showDuoBuild ? "Cancel" : "Start Building"}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  {showDuoBuild && (
+                    <div style={{ padding: "32px", display: "grid", gap: "28px", borderTop: `1px solid ${border}` }}>
+                      <div>
+                        <p style={{ fontFamily: "'Inter', sans-serif", fontSize: "10px", fontWeight: "700", letterSpacing: "0.14em", textTransform: "uppercase" as const, color: gold, marginBottom: "12px" }}>Step 1 — Base (x2, included)</p>
+                        <div style={{ padding: "16px", border: `1px solid ${border}`, borderRadius: "2px", backgroundColor: goldDim }}>
+                          <p style={{ fontFamily: "'Cinzel', serif", fontSize: "16px", color: black }}>Duo Base Tray — TT$100</p>
+                          <p style={{ fontSize: "12px", color: muted, marginTop: "4px" }}>Includes double potatoes, double corn & double house sauce</p>
+                        </div>
+                      </div>
+                      <div>
+                        <p style={{ fontFamily: "'Inter', sans-serif", fontSize: "10px", fontWeight: "700", letterSpacing: "0.14em", textTransform: "uppercase" as const, color: gold, marginBottom: "12px" }}>Step 2 — Pick Seafood (prices doubled for duo)</p>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: "8px" }}>
+                          {DUO_SEAFOOD.map(item => (
+                            <button key={item.id} onClick={() => toggleDuoBuildSeafood(item.id)} style={toggleBtn(duoBuildSeafood.includes(item.id))}>
+                              <span style={{ fontSize: "24px", display: "block", marginBottom: "6px" }}>{item.emoji}</span>
+                              <span style={{ display: "block", fontWeight: "700", fontSize: "12px", letterSpacing: "0.04em" }}>{item.label}</span>
+                              <span style={{ display: "block", color: muted, fontSize: "10px", marginTop: "2px" }}>{item.desc}</span>
+                              <span style={{ display: "block", color: gold, fontWeight: "700", fontSize: "13px", marginTop: "6px" }}>TT${item.price}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <p style={{ fontFamily: "'Inter', sans-serif", fontSize: "10px", fontWeight: "700", letterSpacing: "0.14em", textTransform: "uppercase" as const, color: gold, marginBottom: "12px" }}>Step 3 — Extras <span style={{ color: muted, fontWeight: "400", textTransform: "none" as const, letterSpacing: 0 }}>(optional, prices doubled)</span></p>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: "8px" }}>
+                          {DUO_EXTRAS.map(item => (
+                            <button key={item.id} onClick={() => toggleDuoBuildExtra(item.id)} style={toggleBtn(duoBuildExtras.includes(item.id))}>
+                              <span style={{ fontSize: "24px", display: "block", marginBottom: "6px" }}>{item.emoji}</span>
+                              <span style={{ display: "block", fontWeight: "700", fontSize: "12px" }}>{item.label}</span>
+                              <span style={{ display: "block", color: muted, fontSize: "10px", marginTop: "2px" }}>{item.desc}</span>
+                              <span style={{ display: "block", color: gold, fontWeight: "700", fontSize: "13px", marginTop: "6px" }}>TT${item.price}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <p style={{ fontFamily: "'Inter', sans-serif", fontSize: "10px", fontWeight: "700", letterSpacing: "0.14em", textTransform: "uppercase" as const, color: gold, marginBottom: "12px" }}>Step 4 — Heat Level</p>
+                        <div style={{ display: "flex", gap: "8px" }}>
+                          {HEATS.map(h => (
+                            <button key={h.id} onClick={() => setDuoBuildHeat(h.id as Heat)} style={{
+                              flex: 1, padding: "12px", borderRadius: "2px",
+                              border: duoBuildHeat === h.id ? `1px solid ${gold}` : `1px solid ${border}`,
+                              backgroundColor: duoBuildHeat === h.id ? goldDim : "transparent",
+                              cursor: "pointer", fontFamily: "'Inter', sans-serif", fontSize: "12px",
+                              fontWeight: duoBuildHeat === h.id ? "700" : "400", color: duoBuildHeat === h.id ? gold : muted,
+                            }}>{h.emoji} {h.label}</button>
+                          ))}
+                        </div>
+                      </div>
+                      <div style={{ backgroundColor: black, borderRadius: "4px", padding: "24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div>
+                          <p style={{ fontSize: "10px", fontWeight: "700", letterSpacing: "0.14em", textTransform: "uppercase" as const, color: muted, marginBottom: "6px" }}>Total (Duo)</p>
+                          <p style={{ fontFamily: "'Cinzel', serif", fontSize: "32px", color: white }}>TT${calcDuoBuildPrice(duoBuildSeafood, duoBuildExtras)}</p>
+                        </div>
+                        <button onClick={addDuoBuildToCart} style={goldBtn} className="gold-btn">Add to Cart</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Sticky cart bar */}
             {cartCount > 0 && (
               <div style={{ position: "sticky", bottom: "24px", backgroundColor: black, borderRadius: "4px", padding: "20px 28px", display: "flex", justifyContent: "space-between", alignItems: "center", boxShadow: `0 16px 48px rgba(0,0,0,0.4)`, maxWidth: "1000px", margin: "0 auto", border: `1px solid ${border}` }}>
@@ -790,7 +911,7 @@ export default function Home() {
                 </div>
                 {fulfillment === "delivery" && (
                   <div style={{ backgroundColor: "rgba(196,149,42,0.08)", border: `1px solid ${border}`, borderRadius: "2px", padding: "14px 16px", fontSize: "13px", color: muted, lineHeight: 1.6 }}>
-                    ⚠️ Delivery is currently only available to certain areas in the East. We will confirm your area when we contact you.
+                    ⚠️ Delivery is currently limited to certain areas in the East. Confirmation would be sent upon contact.
                   </div>
                 )}
                 {fulfillment === "delivery" && (
