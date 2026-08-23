@@ -73,6 +73,7 @@ export default function Home() {
   const [submitting,  setSubmitting]  = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [showBuild,    setShowBuild]    = useState(false);
+  const [buildType,    setBuildType]    = useState<"solo" | "duo" | "">("");
   const [showDuoBuild, setShowDuoBuild] = useState(false);
   const [duoBuildSeafood, setDuoBuildSeafood] = useState<string[]>([]);
   const [duoBuildExtras,  setDuoBuildExtras]  = useState<string[]>([]);
@@ -82,6 +83,8 @@ export default function Home() {
   const [buildHeat,    setBuildHeat]    = useState<Heat>("");
   const [fulfillment, setFulfillment] = useState<"delivery" | "pickup" | "">("");
   const [paymentMethod, setPaymentMethod] = useState<"bank" | "cash" | "">("");
+  const [orderDay, setOrderDay] = useState<"thursday" | "friday" | "saturday" | "">("");
+  const [openDays, setOpenDays] = useState({ thursday: true, friday: true, saturday: false });
   const [name,    setName]    = useState("");
   const [phone,   setPhone]   = useState("");
   const [email,   setEmail]   = useState("");
@@ -117,6 +120,17 @@ export default function Home() {
         const menuState: Record<string, boolean> = {};
         data.filter(r => r.key.startsWith("menu_")).forEach(r => { menuState[r.key] = r.value === "true"; });
         if (Object.keys(menuState).length > 0) setMenuItems(prev => ({ ...prev, ...menuState }));
+        const favState: Record<string, boolean> = {};
+        data.filter(r => r.key.startsWith("fav_")).forEach(r => { favState[r.key] = r.value === "true"; });
+        if (Object.keys(favState).length > 0) setFavItems(prev => ({ ...prev, ...favState }));
+        const thuDay = data.find(r => r.key === "day_thursday");
+        const friDay = data.find(r => r.key === "day_friday");
+        const satDay = data.find(r => r.key === "day_saturday");
+        setOpenDays({
+          thursday: thuDay ? thuDay.value === "true" : true,
+          friday:   friDay ? friDay.value === "true" : true,
+          saturday: satDay ? satDay.value === "true" : false,
+        });
       }
     }
     fetchSettings();
@@ -266,6 +280,7 @@ export default function Home() {
     if (fulfillment === "delivery" && !address.trim()) { alert("Please enter your delivery address."); return; }
     if (cart.length === 0)                             { alert("Your cart is empty!"); return; }
     if (!paymentMethod)                                { alert("Please choose a payment method."); return; }
+    if (!orderDay)                                     { alert("Please choose which day you are ordering for."); return; }
     setSubmitting(true); setSubmitError("");
     const details = cart.map(item => `${item.quantity}x ${item.name} (${item.description}) - TT$${item.price * item.quantity}`);
     const { error } = await supabase.from("orders").insert({
@@ -273,7 +288,7 @@ export default function Home() {
       package: cart.map(i => `${i.quantity}x ${i.name}`).join(", "),
       details, fulfillment,
       address: fulfillment === "delivery" ? address.trim() : null,
-      notes: (notes.trim() ? notes.trim() + "\nPayment: " : "Payment: ") + (paymentMethod === "bank" ? "Bank Transfer" : "Cash on Delivery"), total: totalPrice, status: "new",
+      notes: (notes.trim() ? notes.trim() + "\n" : "") + "Payment: " + (paymentMethod === "bank" ? "Bank Transfer" : "Cash on Delivery") + "\nDay: " + orderDay.charAt(0).toUpperCase() + orderDay.slice(1), total: totalPrice, status: "new",
     });
     setSubmitting(false);
     if (error) { setSubmitError("Something went wrong. Please call us at 868-293-0570."); }
@@ -617,7 +632,7 @@ export default function Home() {
                         <div style={{ position: "absolute", top: "12px", left: "12px", backgroundColor: gold, padding: "4px 10px", borderRadius: "1px" }}>
                           <p style={{ fontFamily: "'Inter', sans-serif", fontSize: "9px", fontWeight: "800", letterSpacing: "0.12em", color: black, textTransform: "uppercase" as const }}>{opt.label}</p>
                         </div>
-                        {favItems[`fav_${opt.id.replace("-", "_")}`] && (
+                        {favItems[opt.id] && (
                           <div style={{ position: "absolute", top: "12px", right: "12px", backgroundColor: "#FFD700", padding: "4px 10px", borderRadius: "1px" }}>
                             <p style={{ fontFamily: "'Inter', sans-serif", fontSize: "9px", fontWeight: "800", letterSpacing: "0.1em", color: black, textTransform: "uppercase" as const }}>⭐ Fan Fav</p>
                           </div>
@@ -654,7 +669,7 @@ export default function Home() {
                         <div style={{ position: "absolute", top: "12px", left: "12px", backgroundColor: gold, padding: "4px 10px", borderRadius: "1px" }}>
                           <p style={{ fontFamily: "'Inter', sans-serif", fontSize: "9px", fontWeight: "800", letterSpacing: "0.12em", color: black, textTransform: "uppercase" as const }}>{opt.label}</p>
                         </div>
-                        {favItems[`fav_${opt.id.replace("-", "_")}`] && (
+                        {favItems[opt.id] && (
                           <div style={{ position: "absolute", top: "12px", right: "12px", backgroundColor: "#FFD700", padding: "4px 10px", borderRadius: "1px" }}>
                             <p style={{ fontFamily: "'Inter', sans-serif", fontSize: "9px", fontWeight: "800", letterSpacing: "0.1em", color: black, textTransform: "uppercase" as const }}>⭐ Fan Fav</p>
                           </div>
@@ -716,9 +731,19 @@ export default function Home() {
                       <div>
                         <p style={{ fontSize: "10px", fontWeight: "700", letterSpacing: "0.2em", color: gold, textTransform: "uppercase" as const, marginBottom: "12px" }}>Your Seafood. Your Sauce. Your Way.</p>
                         <h4 style={{ fontFamily: "'Cinzel', serif", fontSize: "clamp(24px, 3vw, 36px)", color: white, marginBottom: "16px", lineHeight: 1.1 }}>Build Your Own Boil</h4>
-                        <button onClick={() => setShowBuild(!showBuild)} style={goldBtn} className="gold-btn">
-                          {showBuild ? "Cancel" : "Start Building"}
-                        </button>
+                        <div style={{ display: "flex", gap: "10px" }}>
+                          <button onClick={() => { setBuildType("solo"); setShowBuild(true); setShowDuoBuild(false); }} style={{ ...goldBtn, padding: "12px 20px", fontSize: "12px", backgroundColor: buildType === "solo" && showBuild ? "#8a6a1a" : gold }} className="gold-btn">
+                            Solo Build
+                          </button>
+                          <button onClick={() => { setBuildType("duo"); setShowDuoBuild(true); setShowBuild(false); }} style={{ ...goldBtn, padding: "12px 20px", fontSize: "12px", backgroundColor: buildType === "duo" && showDuoBuild ? "#8a6a1a" : gold }} className="gold-btn">
+                            Duo Build
+                          </button>
+                          {(showBuild || showDuoBuild) && (
+                            <button onClick={() => { setShowBuild(false); setShowDuoBuild(false); setBuildType(""); }} style={{ padding: "12px 20px", fontSize: "12px", borderRadius: "2px", border: `1px solid ${border}`, backgroundColor: "transparent", color: muted, cursor: "pointer", fontFamily: "'Inter', sans-serif" }}>
+                              Cancel
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -776,29 +801,17 @@ export default function Home() {
               </div>
             )}
 
-            {/* Duo Build Your Own */}
-            {buildEnabled && (
-              <div style={{ maxWidth: "1000px", margin: "0 auto 40px" }}>
-                <div style={{ display: "flex", alignItems: "baseline", gap: "16px", marginBottom: "32px", borderBottom: `1px solid ${border}`, paddingBottom: "16px" }}>
-                  <h3 style={{ fontFamily: "'Cinzel', serif", fontSize: "clamp(22px, 3vw, 32px)", fontWeight: "600", color: black }}>Build Your Own Boil (Duo)</h3>
-                  <p style={{ fontSize: "12px", color: muted, letterSpacing: "0.06em" }}>Ideal for 2 · From TT$120</p>
-                </div>
+            {/* Duo Build configurator - now inside main Build section */}
+            {buildEnabled && showDuoBuild && (
+              <div style={{ maxWidth: "1000px", margin: "-20px auto 40px" }}>
                 <div style={{ backgroundColor: white, border: `1px solid ${border}`, borderRadius: "4px", overflow: "hidden" }}>
-                  <div style={{ position: "relative", height: "240px", overflow: "hidden" }}>
-                    <img src="/spread2.jpeg" alt="Build Your Own Boil Duo" style={{ width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }} />
-                    <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to right, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.3) 100%)", pointerEvents: "none" }} />
-                    <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", padding: "40px" }}>
-                      <div>
-                        <p style={{ fontSize: "10px", fontWeight: "700", letterSpacing: "0.2em", color: gold, textTransform: "uppercase" as const, marginBottom: "12px" }}>Double the Flavour. Double the Fun.</p>
-                        <h4 style={{ fontFamily: "'Cinzel', serif", fontSize: "clamp(24px, 3vw, 36px)", color: white, marginBottom: "16px", lineHeight: 1.1 }}>Build Your Own Boil (Duo)</h4>
-                        <button onClick={() => setShowDuoBuild(!showDuoBuild)} style={goldBtn} className="gold-btn">
-                          {showDuoBuild ? "Cancel" : "Start Building"}
-                        </button>
-                      </div>
-                    </div>
+                  <div style={{ padding: "20px 24px", borderBottom: `1px solid ${border}`, backgroundColor: goldDim }}>
+                    <p style={{ fontFamily: "'Cinzel', serif", fontSize: "20px", color: black }}>Build Your Own Boil — Duo Edition</p>
+                    <p style={{ fontSize: "12px", color: muted, marginTop: "4px" }}>Perfect for sharing · Prices reflect double portions</p>
                   </div>
-                  {showDuoBuild && (
-                    <div style={{ padding: "32px", display: "grid", gap: "28px", borderTop: `1px solid ${border}` }}>
+                  <div style={{ display: "none" }}>
+                  </div>
+                    <div style={{ padding: "32px", display: "grid", gap: "28px" }}>
                       <div>
                         <p style={{ fontFamily: "'Inter', sans-serif", fontSize: "10px", fontWeight: "700", letterSpacing: "0.14em", textTransform: "uppercase" as const, color: gold, marginBottom: "12px" }}>Step 1 — Base (x2, included)</p>
                         <div style={{ padding: "16px", border: `1px solid ${border}`, borderRadius: "2px", backgroundColor: goldDim }}>
@@ -854,7 +867,6 @@ export default function Home() {
                         <button onClick={addDuoBuildToCart} style={goldBtn} className="gold-btn">Add to Cart</button>
                       </div>
                     </div>
-                  )}
                 </div>
               </div>
             )}
@@ -938,7 +950,40 @@ export default function Home() {
                     <p style={{ fontFamily: "'Cinzel', serif", fontSize: "24px", color: gold }}>TT${totalPrice}</p>
                   </div>
                 </div>
-                {/* Payment Method */}
+                {/* Order Day */}
+                <div>
+                  <label style={labelStyle}>Which Day Are You Ordering For? *</label>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px" }}>
+                    {[
+                      { id: "thursday", label: "Thursday" },
+                      { id: "friday",   label: "Friday"   },
+                      { id: "saturday", label: "Saturday" },
+                    ].map(day => {
+                      const isOpen = openDays[day.id as keyof typeof openDays];
+                      return (
+                        <button
+                          key={day.id}
+                          onClick={() => isOpen && setOrderDay(day.id as any)}
+                          disabled={!isOpen}
+                          style={{
+                            padding: "14px 8px", borderRadius: "2px", cursor: isOpen ? "pointer" : "not-allowed",
+                            border: orderDay === day.id ? `1px solid ${gold}` : `1px solid ${border}`,
+                            backgroundColor: !isOpen ? "rgba(0,0,0,0.04)" : orderDay === day.id ? goldDim : "transparent",
+                            fontFamily: "'Inter', sans-serif", fontSize: "13px",
+                            fontWeight: orderDay === day.id ? "700" : "400",
+                            color: !isOpen ? muted : orderDay === day.id ? gold : muted,
+                            opacity: isOpen ? 1 : 0.5, transition: "all 0.2s",
+                          }}
+                        >
+                          {day.label}
+                          {!isOpen && <span style={{ display: "block", fontSize: "10px", marginTop: "2px" }}>Closed</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+              {/* Payment Method */}
                 <div>
                   <label style={labelStyle}>Payment Method *</label>
                   <div style={{ display: "flex", gap: "10px" }}>
@@ -1002,7 +1047,8 @@ export default function Home() {
             <div style={{ margin: "20px auto", maxWidth: "440px", textAlign: "left" as const }}>
               {cart.map((item, idx) => <p key={idx} style={{ fontSize: "13px", color: muted, marginBottom: "6px", padding: "8px 0", borderBottom: `1px solid ${border}` }}>· {item.quantity}x {item.name} — {item.description}</p>)}
             </div>
-            <p style={{ color: muted, fontSize: "13px", marginTop: "16px" }}>{fulfillment === "delivery" ? `🚗 Delivering to: ${address}` : "🏠 Pickup — Arima, Saturday 12–6PM"}</p>
+            <p style={{ color: muted, fontSize: "13px", marginTop: "16px" }}>{fulfillment === "delivery" ? `🚗 Delivering to: ${address}` : "🏠 Pickup — Arima"}</p>
+            {orderDay && <p style={{ color: gold, fontSize: "15px", fontWeight: "700", marginTop: "8px" }}>📅 Your order is for {orderDay.charAt(0).toUpperCase() + orderDay.slice(1)}</p>}
             <p style={{ fontFamily: "'Cinzel', serif", fontSize: "28px", color: gold, margin: "20px 0 8px" }}>TT${totalPrice}</p>
             <p style={{ color: muted, fontSize: "12px", letterSpacing: "0.04em" }}>We will confirm via text to <strong>{phone}</strong> before Friday 8PM.</p>
           </section>
