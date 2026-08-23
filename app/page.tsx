@@ -64,6 +64,7 @@ export default function Home() {
   const [buildExtras,  setBuildExtras]  = useState<string[]>([]);
   const [buildHeat,    setBuildHeat]    = useState<Heat>("");
   const [fulfillment, setFulfillment] = useState<"delivery" | "pickup" | "">("");
+  const [paymentMethod, setPaymentMethod] = useState<"bank" | "cash" | "">("");
   const [name,    setName]    = useState("");
   const [phone,   setPhone]   = useState("");
   const [email,   setEmail]   = useState("");
@@ -226,6 +227,7 @@ export default function Home() {
     if (!fulfillment)                                  { alert("Please choose delivery or pickup."); return; }
     if (fulfillment === "delivery" && !address.trim()) { alert("Please enter your delivery address."); return; }
     if (cart.length === 0)                             { alert("Your cart is empty!"); return; }
+    if (!paymentMethod)                                { alert("Please choose a payment method."); return; }
     setSubmitting(true); setSubmitError("");
     const details = cart.map(item => `${item.quantity}x ${item.name} (${item.description}) - TT$${item.price * item.quantity}`);
     const { error } = await supabase.from("orders").insert({
@@ -233,7 +235,7 @@ export default function Home() {
       package: cart.map(i => `${i.quantity}x ${i.name}`).join(", "),
       details, fulfillment,
       address: fulfillment === "delivery" ? address.trim() : null,
-      notes: notes.trim() || null, total: totalPrice, status: "new",
+      notes: (notes.trim() ? notes.trim() + "\nPayment: " : "Payment: ") + (paymentMethod === "bank" ? "Bank Transfer" : "Cash on Delivery"), total: totalPrice, status: "new",
     });
     setSubmitting(false);
     if (error) { setSubmitError("Something went wrong. Please call us at 868-293-0570."); }
@@ -577,7 +579,7 @@ export default function Home() {
                         <div style={{ position: "absolute", top: "12px", left: "12px", backgroundColor: gold, padding: "4px 10px", borderRadius: "1px" }}>
                           <p style={{ fontFamily: "'Inter', sans-serif", fontSize: "9px", fontWeight: "800", letterSpacing: "0.12em", color: black, textTransform: "uppercase" as const }}>{opt.label}</p>
                         </div>
-                        {favItems[`fav_${opt.id.replace("-", "_")}`] && (
+                        {favItems[`fav_${opt.id.replace(/-/g, "_")}`] && (
                           <div style={{ position: "absolute", top: "12px", right: "12px", backgroundColor: "#FFD700", padding: "4px 10px", borderRadius: "1px" }}>
                             <p style={{ fontFamily: "'Inter', sans-serif", fontSize: "9px", fontWeight: "800", letterSpacing: "0.1em", color: black, textTransform: "uppercase" as const }}>⭐ Fan Fav</p>
                           </div>
@@ -614,7 +616,7 @@ export default function Home() {
                         <div style={{ position: "absolute", top: "12px", left: "12px", backgroundColor: gold, padding: "4px 10px", borderRadius: "1px" }}>
                           <p style={{ fontFamily: "'Inter', sans-serif", fontSize: "9px", fontWeight: "800", letterSpacing: "0.12em", color: black, textTransform: "uppercase" as const }}>{opt.label}</p>
                         </div>
-                        {favItems[`fav_${opt.id.replace("-", "_")}`] && (
+                        {favItems[`fav_${opt.id.replace(/-/g, "_")}`] && (
                           <div style={{ position: "absolute", top: "12px", right: "12px", backgroundColor: "#FFD700", padding: "4px 10px", borderRadius: "1px" }}>
                             <p style={{ fontFamily: "'Inter', sans-serif", fontSize: "9px", fontWeight: "800", letterSpacing: "0.1em", color: black, textTransform: "uppercase" as const }}>⭐ Fan Fav</p>
                           </div>
@@ -815,6 +817,47 @@ export default function Home() {
                     <p style={{ fontFamily: "'Cinzel', serif", fontSize: "24px", color: gold }}>TT${totalPrice}</p>
                   </div>
                 </div>
+                {/* Payment Method */}
+                <div>
+                  <label style={labelStyle}>Payment Method *</label>
+                  <div style={{ display: "flex", gap: "10px" }}>
+                    <button onClick={() => setPaymentMethod("cash")} style={{ flex: 1, padding: "14px", borderRadius: "2px", border: paymentMethod === "cash" ? `1px solid ${gold}` : `1px solid ${border}`, backgroundColor: paymentMethod === "cash" ? goldDim : "transparent", cursor: "pointer", fontFamily: "'Inter', sans-serif", fontSize: "13px", fontWeight: paymentMethod === "cash" ? "700" : "400", color: paymentMethod === "cash" ? gold : muted, transition: "all 0.2s" }}>
+                      💵 Cash on Delivery
+                    </button>
+                    <button onClick={() => setPaymentMethod("bank")} style={{ flex: 1, padding: "14px", borderRadius: "2px", border: paymentMethod === "bank" ? `1px solid ${gold}` : `1px solid ${border}`, backgroundColor: paymentMethod === "bank" ? goldDim : "transparent", cursor: "pointer", fontFamily: "'Inter', sans-serif", fontSize: "13px", fontWeight: paymentMethod === "bank" ? "700" : "400", color: paymentMethod === "bank" ? gold : muted, transition: "all 0.2s" }}>
+                      🏦 Bank Transfer
+                    </button>
+                  </div>
+                </div>
+
+                {paymentMethod === "bank" && (
+                  <div style={{ backgroundColor: "#FFFBE6", border: "1px solid #FFD700", borderRadius: "4px", padding: "20px 24px" }}>
+                    <p style={{ fontFamily: "'Inter', sans-serif", fontSize: "10px", fontWeight: "700", letterSpacing: "0.14em", textTransform: "uppercase" as const, color: gold, marginBottom: "14px" }}>Bank Transfer Details</p>
+                    <div style={{ display: "grid", gap: "0" }}>
+                      {[
+                        { label: "Bank",           value: "First Citizens Bank"    },
+                        { label: "Account Name",   value: "Aden Anderson Flanders" },
+                        { label: "Account Number", value: "3058440"                },
+                        { label: "Account Type",   value: "Savings"                },
+                      ].map(row => (
+                        <div key={row.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "1px solid rgba(0,0,0,0.06)", fontSize: "13px" }}>
+                          <span style={{ color: muted }}>{row.label}</span>
+                          <span style={{ fontWeight: "700", color: charcoal }}>{row.value}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <p style={{ fontSize: "11px", color: "#7a5c00", lineHeight: 1.8, marginTop: "14px", fontStyle: "italic" }}>
+                      Use your full name as the payment reference. Send proof of payment to @theclub.boils on Instagram or WhatsApp 868-293-0570.
+                    </p>
+                  </div>
+                )}
+
+                {paymentMethod === "cash" && (
+                  <div style={{ backgroundColor: "rgba(196,149,42,0.08)", border: `1px solid ${border}`, borderRadius: "4px", padding: "14px 16px", fontSize: "12px", color: muted, lineHeight: 1.7 }}>
+                    Payment will be collected upon delivery or pickup. Please have the exact amount ready.
+                  </div>
+                )}
+
                 {submitError && <div style={{ backgroundColor: "#FFECEC", border: "1px solid #F5C6C6", borderRadius: "2px", padding: "14px", fontSize: "12px", color: "#A03030" }}>⚠️ {submitError}</div>}
                 <button onClick={handleSubmit} disabled={submitting} style={{ ...goldBtn, width: "100%", padding: "18px", fontSize: "13px", opacity: submitting ? 0.7 : 1 }} className="gold-btn">
                   {submitting ? "Placing Order..." : `Confirm Order — TT$${totalPrice}`}
@@ -830,6 +873,11 @@ export default function Home() {
             <p style={{ fontSize: "48px", marginBottom: "16px" }}>🎉</p>
             <h2 style={{ fontFamily: "'Cinzel', serif", fontSize: "32px", fontWeight: "600", color: black, marginBottom: "16px" }}>Order Received</h2>
             <p style={{ color: muted, fontSize: "14px", marginBottom: "8px" }}>Thank you, <strong style={{ color: black }}>{name}</strong>. Your order has been placed successfully.</p>
+            {paymentMethod === "bank" && (
+              <div style={{ backgroundColor: "#FFFBE6", border: "1px solid #FFD700", borderRadius: "4px", padding: "16px 20px", margin: "16px auto", maxWidth: "440px", fontSize: "13px", color: "#7a5c00", lineHeight: 1.8 }}>
+                <strong>Proof of payment will be requested upon order confirmation.</strong> Please send your bank transfer receipt to @theclub.boils on Instagram or WhatsApp 868-293-0570 to confirm your order.
+              </div>
+            )}
             <div style={{ margin: "20px auto", maxWidth: "440px", textAlign: "left" as const }}>
               {cart.map((item, idx) => <p key={idx} style={{ fontSize: "13px", color: muted, marginBottom: "6px", padding: "8px 0", borderBottom: `1px solid ${border}` }}>· {item.quantity}x {item.name} — {item.description}</p>)}
             </div>
