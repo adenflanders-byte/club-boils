@@ -632,7 +632,7 @@ export default function Home() {
                         <div style={{ position: "absolute", top: "12px", left: "12px", backgroundColor: gold, padding: "4px 10px", borderRadius: "1px" }}>
                           <p style={{ fontFamily: "'Inter', sans-serif", fontSize: "9px", fontWeight: "800", letterSpacing: "0.12em", color: black, textTransform: "uppercase" as const }}>{opt.label}</p>
                         </div>
-                        {favItems[opt.id] && (
+                        {favItems[`fav_solo_${opt.id.split("-")[1]}`] && (
                           <div style={{ position: "absolute", top: "12px", right: "12px", backgroundColor: "#FFD700", padding: "4px 10px", borderRadius: "1px" }}>
                             <p style={{ fontFamily: "'Inter', sans-serif", fontSize: "9px", fontWeight: "800", letterSpacing: "0.1em", color: black, textTransform: "uppercase" as const }}>⭐ Fan Fav</p>
                           </div>
@@ -669,7 +669,7 @@ export default function Home() {
                         <div style={{ position: "absolute", top: "12px", left: "12px", backgroundColor: gold, padding: "4px 10px", borderRadius: "1px" }}>
                           <p style={{ fontFamily: "'Inter', sans-serif", fontSize: "9px", fontWeight: "800", letterSpacing: "0.12em", color: black, textTransform: "uppercase" as const }}>{opt.label}</p>
                         </div>
-                        {favItems[opt.id] && (
+                        {favItems[`fav_duo_${opt.id.split("-")[1]}`] && (
                           <div style={{ position: "absolute", top: "12px", right: "12px", backgroundColor: "#FFD700", padding: "4px 10px", borderRadius: "1px" }}>
                             <p style={{ fontFamily: "'Inter', sans-serif", fontSize: "9px", fontWeight: "800", letterSpacing: "0.1em", color: black, textTransform: "uppercase" as const }}>⭐ Fan Fav</p>
                           </div>
@@ -809,9 +809,7 @@ export default function Home() {
                     <p style={{ fontFamily: "'Cinzel', serif", fontSize: "20px", color: black }}>Build Your Own Boil — Duo Edition</p>
                     <p style={{ fontSize: "12px", color: muted, marginTop: "4px" }}>Perfect for sharing · Prices reflect double portions</p>
                   </div>
-                  <div style={{ display: "none" }}>
-                  </div>
-                    <div style={{ padding: "32px", display: "grid", gap: "28px" }}>
+                  <div style={{ padding: "32px", display: "grid", gap: "28px" }}>
                       <div>
                         <p style={{ fontFamily: "'Inter', sans-serif", fontSize: "10px", fontWeight: "700", letterSpacing: "0.14em", textTransform: "uppercase" as const, color: gold, marginBottom: "12px" }}>Step 1 — Base (x2, included)</p>
                         <div style={{ padding: "16px", border: `1px solid ${border}`, borderRadius: "2px", backgroundColor: goldDim }}>
@@ -867,8 +865,8 @@ export default function Home() {
                         <button onClick={addDuoBuildToCart} style={goldBtn} className="gold-btn">Add to Cart</button>
                       </div>
                     </div>
+                  </div>
                 </div>
-              </div>
             )}
 
             {/* Sticky cart bar */}

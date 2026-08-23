@@ -54,10 +54,16 @@ export default function AdminPage() {
   const [menuItems, setMenuItems] = useState<Record<string, boolean>>({
     menu_solo_shrimp: true, menu_solo_crab: true, menu_solo_mix: true,
     menu_duo_shrimp: true,  menu_duo_crab: true,  menu_duo_mix: true,
-    menu_ramen: true, menu_wings: true, menu_sauce: true, menu_build: true,
+    menu_ramen: true, menu_wings: true, menu_sauce: true, menu_build: true, menu_combo: true,
   });
   const [settingsLoading, setSettingsLoading] = useState(false);
   const [settingsSaved,   setSettingsSaved]   = useState(false);
+  const [openDays, setOpenDays] = useState({ thursday: true, friday: true, saturday: false });
+  const [favItems, setFavItems] = useState<Record<string, boolean>>({
+    fav_solo_shrimp: false, fav_solo_crab: false, fav_solo_mix: false,
+    fav_duo_shrimp: false,  fav_duo_crab: false,  fav_duo_mix: false,
+    fav_ramen: false, fav_wings: false, fav_sauce: false, fav_build: false, fav_combo: false,
+  });
   const [pendingReviews, setPendingReviews] = useState<{id: string, name: string, rating: number, comment: string, created_at: string}[]>([]);
 
   async function fetchSettings() {
@@ -78,6 +84,10 @@ export default function AdminPage() {
     const updates = [
       { key: "orders_open", value: String(ordersOpen) },
       ...Object.entries(menuItems).map(([key, value]) => ({ key, value: String(value) })),
+      ...Object.entries(favItems).map(([key, value]) => ({ key, value: String(value) })),
+      { key: "day_thursday", value: String(openDays.thursday) },
+      { key: "day_friday",   value: String(openDays.friday)   },
+      { key: "day_saturday", value: String(openDays.saturday) },
     ];
     for (const update of updates) {
       await supabase.from("settings").update({ value: update.value }).eq("key", update.key);
@@ -453,6 +463,7 @@ export default function AdminPage() {
               { key: "menu_wings",       label: "Wings Boil"            },
               { key: "menu_sauce",       label: "House Sauce"           },
               { key: "menu_build",       label: "Build Your Own Boil"   },
+              { key: "menu_combo",       label: "Club Ramen Wings Combo" },
             ].map(item => (
               <div
                 key={item.key}
@@ -463,6 +474,53 @@ export default function AdminPage() {
                   {menuItems[item.key] && <span style={{ color: C.white, fontSize: "11px", fontWeight: "700" }}>✓</span>}
                 </div>
                 <span style={{ fontSize: "13px", color: menuItems[item.key] ? C.charcoal : C.muted, fontWeight: menuItems[item.key] ? "500" : "400" }}>{item.label}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Open Days */}
+          <p style={{ fontFamily: FONT_BODY, fontSize: "12px", fontWeight: "700", letterSpacing: "0.08em", textTransform: "uppercase" as const, color: C.muted, marginBottom: "12px", marginTop: "20px" }}>Open Days</p>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px", marginBottom: "20px" }}>
+            {([
+              { key: "thursday", label: "Thursday" },
+              { key: "friday",   label: "Friday"   },
+              { key: "saturday", label: "Saturday"  },
+            ] as const).map(day => (
+              <div
+                key={day.key}
+                onClick={() => setOpenDays(prev => ({ ...prev, [day.key]: !prev[day.key] }))}
+                style={{ padding: "16px", borderRadius: "4px", border: openDays[day.key] ? "2px solid #1A7A3A" : `1px solid ${C.border}`, cursor: "pointer", backgroundColor: openDays[day.key] ? "#EAFFF0" : "#FAFAFA", textAlign: "center" as const }}
+              >
+                <p style={{ fontWeight: "700", fontSize: "14px", color: openDays[day.key] ? "#1A7A3A" : C.muted }}>{day.label}</p>
+                <p style={{ fontSize: "11px", marginTop: "4px", color: openDays[day.key] ? "#1A7A3A" : C.muted }}>{openDays[day.key] ? "✅ Open" : "🔒 Closed"}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Fan Favourites */}
+          <p style={{ fontFamily: FONT_BODY, fontSize: "12px", fontWeight: "700", letterSpacing: "0.08em", textTransform: "uppercase" as const, color: C.muted, marginBottom: "12px", marginTop: "20px" }}>Fan Favourites</p>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "20px" }}>
+            {[
+              { key: "fav_solo_shrimp", label: "Solo — Shrimp"         },
+              { key: "fav_solo_crab",   label: "Solo — Snow Crab"      },
+              { key: "fav_solo_mix",    label: "Solo — Mix"            },
+              { key: "fav_duo_shrimp",  label: "Duo — Shrimp"          },
+              { key: "fav_duo_crab",    label: "Duo — Snow Crab"       },
+              { key: "fav_duo_mix",     label: "Duo — Mix"             },
+              { key: "fav_ramen",       label: "Shrimp Alfredo Ramen"  },
+              { key: "fav_wings",       label: "Wings Boil"            },
+              { key: "fav_combo",       label: "Ramen Wings Combo"     },
+              { key: "fav_build",       label: "Build Your Own Boil"   },
+            ].map(item => (
+              <div
+                key={item.key}
+                onClick={() => setFavItems(prev => ({ ...prev, [item.key]: !prev[item.key] }))}
+                style={{ display: "flex", alignItems: "center", gap: "10px", padding: "12px 14px", borderRadius: "4px", border: favItems[item.key] ? "1px solid #FFD700" : `1px solid ${C.border}`, cursor: "pointer", backgroundColor: favItems[item.key] ? "#FFFBE6" : "#FAFAFA" }}
+              >
+                <div style={{ width: "18px", height: "18px", borderRadius: "4px", border: `2px solid ${favItems[item.key] ? "#FFD700" : C.border}`, backgroundColor: favItems[item.key] ? "#FFD700" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  {favItems[item.key] && <span style={{ color: C.black, fontSize: "11px", fontWeight: "700" }}>⭐</span>}
+                </div>
+                <span style={{ fontSize: "13px", color: favItems[item.key] ? C.charcoal : C.muted, fontWeight: favItems[item.key] ? "500" : "400" }}>{item.label}</span>
               </div>
             ))}
           </div>
@@ -607,6 +665,16 @@ export default function AdminPage() {
           <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by name, phone or order ID..." style={inputStyle} />
         </div>
 
+        {/* Day filter */}
+        <div style={{ display: "flex", gap: "8px", marginBottom: "12px", flexWrap: "wrap" as const }}>
+          {(["All Days", "Thursday", "Friday", "Saturday"] as const).map(day => (
+            <button key={day} onClick={() => setSearch(day === "All Days" ? "" : `Day: ${day}`)}
+              style={{ padding: "7px 14px", borderRadius: "4px", border: "none", cursor: "pointer", fontFamily: FONT_BODY, fontSize: "12px", fontWeight: "500", backgroundColor: (day === "All Days" && search === "") || search === `Day: ${day}` ? C.gold : C.white, color: (day === "All Days" && search === "") || search === `Day: ${day}` ? C.white : C.charcoal }}>
+              {day}
+            </button>
+          ))}
+        </div>
+
         {/* Filter tabs */}
         <div style={{ display: "flex", gap: "8px", marginBottom: "20px", flexWrap: "wrap" as const }}>
           {(["all","new","confirmed","ready","completed","cancelled"] as const).map(tab => (
@@ -645,6 +713,11 @@ export default function AdminPage() {
                       <p style={{ fontWeight: "600", fontSize: "15px", color: C.black }}>{order.name}</p>
                       <p style={{ fontSize: "12px", color: C.muted, marginTop: "2px" }}>{order.package}</p>
                     </div>
+                    {order.notes && order.notes.includes("Day:") && (
+                      <span style={{ backgroundColor: "#EBF3FF", color: "#1A56A4", fontSize: "11px", fontWeight: "700", padding: "3px 10px", borderRadius: "20px", whiteSpace: "nowrap" as const }}>
+                        📅 {order.notes.match(/Day: (\w+)/)?.[1] || ""}
+                      </span>
+                    )}
                     <span style={{ fontSize: "13px", color: C.muted, whiteSpace: "nowrap" as const }}>{order.fulfillment === "delivery" ? "🚗 Delivery" : "🏠 Pickup"}</span>
                     <span style={{ fontFamily: FONT_DISPLAY, fontSize: "17px", color: C.black, whiteSpace: "nowrap" as const }}>TT${order.total}</span>
                     <div style={{ textAlign: "right" as const, minWidth: "120px" }}>
