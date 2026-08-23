@@ -77,6 +77,11 @@ export default function Home() {
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const [reviewSubmitted,  setReviewSubmitted]  = useState(false);
   const [ordersOpen, setOrdersOpen] = useState(true);
+  const [favItems, setFavItems] = useState<Record<string, boolean>>({
+    fav_solo_shrimp: false, fav_solo_crab: false, fav_solo_mix: false,
+    fav_duo_shrimp: false,  fav_duo_crab: false,  fav_duo_mix: false,
+    fav_ramen: false, fav_wings: false, fav_sauce: false, fav_build: false, fav_combo: false,
+  });
   const [menuItems,  setMenuItems]  = useState<Record<string, boolean>>({
     menu_solo_shrimp: true, menu_solo_crab: true, menu_solo_mix: true,
     menu_duo_shrimp: true,  menu_duo_crab: true,  menu_duo_mix: true,
@@ -572,6 +577,11 @@ export default function Home() {
                         <div style={{ position: "absolute", top: "12px", left: "12px", backgroundColor: gold, padding: "4px 10px", borderRadius: "1px" }}>
                           <p style={{ fontFamily: "'Inter', sans-serif", fontSize: "9px", fontWeight: "800", letterSpacing: "0.12em", color: black, textTransform: "uppercase" as const }}>{opt.label}</p>
                         </div>
+                        {favItems[`fav_${opt.id.replace("-", "_")}`] && (
+                          <div style={{ position: "absolute", top: "12px", right: "12px", backgroundColor: "#FFD700", padding: "4px 10px", borderRadius: "1px" }}>
+                            <p style={{ fontFamily: "'Inter', sans-serif", fontSize: "9px", fontWeight: "800", letterSpacing: "0.1em", color: black, textTransform: "uppercase" as const }}>⭐ Fan Fav</p>
+                          </div>
+                        )}
                       </div>
                       <div style={{ padding: "20px" }}>
                         <p style={{ fontFamily: "'Cinzel', serif", fontSize: "18px", color: black, marginBottom: "4px" }}>Club Solo</p>
@@ -604,6 +614,11 @@ export default function Home() {
                         <div style={{ position: "absolute", top: "12px", left: "12px", backgroundColor: gold, padding: "4px 10px", borderRadius: "1px" }}>
                           <p style={{ fontFamily: "'Inter', sans-serif", fontSize: "9px", fontWeight: "800", letterSpacing: "0.12em", color: black, textTransform: "uppercase" as const }}>{opt.label}</p>
                         </div>
+                        {favItems[`fav_${opt.id.replace("-", "_")}`] && (
+                          <div style={{ position: "absolute", top: "12px", right: "12px", backgroundColor: "#FFD700", padding: "4px 10px", borderRadius: "1px" }}>
+                            <p style={{ fontFamily: "'Inter', sans-serif", fontSize: "9px", fontWeight: "800", letterSpacing: "0.1em", color: black, textTransform: "uppercase" as const }}>⭐ Fan Fav</p>
+                          </div>
+                        )}
                       </div>
                       <div style={{ padding: "20px" }}>
                         <p style={{ fontFamily: "'Cinzel', serif", fontSize: "18px", color: black, marginBottom: "4px" }}>Club Duo</p>
@@ -953,4 +968,3 @@ export default function Home() {
     </>
   );
 }
- 
