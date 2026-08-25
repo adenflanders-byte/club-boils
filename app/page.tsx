@@ -1229,6 +1229,7 @@ export default function Home() {
             <span style={{ color: muted, fontSize: "11px", letterSpacing: "0.08em" }}>Arima, Trinidad</span>
           </div>
           <p style={{ color: "rgba(255,255,255,0.15)", fontSize: "10px", letterSpacing: "0.06em" }}>© {new Date().getFullYear()} The Club Boils</p>
+          <a href="/admin" style={{ color: "rgba(255,255,255,0.1)", fontSize: "10px", textDecoration: "none", letterSpacing: "0.06em" }} onMouseEnter={e => (e.currentTarget.style.color = gold)} onMouseLeave={e => (e.currentTarget.style.color = "rgba(255,255,255,0.1)")}>Admin</a>
         </footer>
 
       </main>
