@@ -827,15 +827,7 @@ export default function AdminPage() {
           <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by name, phone or order ID..." style={inputStyle} />
         </div>
 
-        {/* Day filter */}
-        <div style={{ display: "flex", gap: "8px", marginBottom: "12px", flexWrap: "wrap" as const }}>
-          {(["All Days", "Thursday", "Friday", "Saturday"] as const).map(day => (
-            <button key={day} onClick={() => setSearch(day === "All Days" ? "" : `Day: ${day}`)}
-              style={{ padding: "7px 14px", borderRadius: "4px", border: "none", cursor: "pointer", fontFamily: FONT_BODY, fontSize: "12px", fontWeight: "500", backgroundColor: (day === "All Days" && search === "") || search === `Day: ${day}` ? C.gold : C.white, color: (day === "All Days" && search === "") || search === `Day: ${day}` ? C.white : C.charcoal }}>
-              {day}
-            </button>
-          ))}
-        </div>
+
 
         {/* Filter tabs */}
         <div style={{ display: "flex", gap: "8px", marginBottom: "20px", flexWrap: "wrap" as const }}>
