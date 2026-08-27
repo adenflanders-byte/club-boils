@@ -203,7 +203,9 @@ Return ONLY a JSON object like this, no other text:
       if (!groups[key]) groups[key] = { transactions: [], orderRevenue: 0 };
       groups[key].orderRevenue += o.amount;
     });
-    return Object.entries(groups).sort((a, b) => b[0].localeCompare(a[0]));
+    return Object.entries(groups)
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([key, value]) => [key, value.transactions, value.orderRevenue] as [string, Transaction[], number]);
   }
 
   function formatPeriod(key: string) {
