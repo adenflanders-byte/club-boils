@@ -29,7 +29,7 @@ export default function AccountsPage() {
   const [pwError,      setPwError]      = useState(false);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading,      setLoading]      = useState(false);
-  const [activeTab,    setActiveTab]    = useState<"overview" | "transactions" | "add">("overview");
+  const [activeTab,    setActiveTab]    = useState<"overview" | "transactions" | "add" | "receipts">("overview");
   const [viewMode,     setViewMode]     = useState<"weekly" | "monthly">("weekly");
   const [filterType,   setFilterType]   = useState<"all" | "income" | "expense">("all");
   const [filterCat,    setFilterCat]    = useState("all");
@@ -42,6 +42,86 @@ export default function AccountsPage() {
   const [newDate,        setNewDate]        = useState(new Date().toISOString().split("T")[0]);
   const [saving,         setSaving]         = useState(false);
   const [saved,          setSaved]          = useState(false);
+
+  // Receipt scanning
+  const [receiptTab,     setReceiptTab]     = useState<"manual" | "scan">("manual");
+  const [scanning,       setScanning]       = useState(false);
+  const [scanResult,     setScanResult]     = useState<{items: {description: string, amount: number, category: string}[], total: number} | null>(null);
+  const [scanError,      setScanError]      = useState("");
+
+  async function scanReceipt(file: File) {
+    setScanError("");
+    setScanResult(null);
+    setScanning(true);
+    try {
+      const base64 = await new Promise<string>((res, rej) => {
+        const r = new FileReader();
+        r.onload = () => res((r.result as string).split(",")[1]);
+        r.onerror = () => rej(new Error("Read failed"));
+        r.readAsDataURL(file);
+      });
+
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-6",
+          max_tokens: 1000,
+          messages: [{
+            role: "user",
+            content: [
+              {
+                type: "image",
+                source: { type: "base64", media_type: file.type as any, data: base64 }
+              },
+              {
+                type: "text",
+                text: `You are analyzing a receipt for a seafood business called The Club Boils in Trinidad.
+Extract all line items from this receipt.
+For each item, determine the best category from: Ingredients, Packaging, Gas & Transport, Equipment, Marketing, Other.
+Return ONLY a JSON object like this, no other text:
+{
+  "items": [
+    {"description": "item name", "amount": 25.50, "category": "Ingredients"}
+  ],
+  "total": 25.50,
+  "date": "YYYY-MM-DD or empty string if not visible"
+}`
+              }
+            ]
+          }]
+        })
+      });
+
+      const data = await response.json();
+      const text = data.content?.[0]?.text || "";
+      const clean = text.replace(/\`\`\`json|\`\`\`/g, "").trim();
+      const parsed = JSON.parse(clean);
+      setScanResult(parsed);
+    } catch (err) {
+      setScanError("Could not read receipt. Please try a clearer photo or enter manually.");
+    }
+    setScanning(false);
+  }
+
+  async function saveScanResult() {
+    if (!scanResult) return;
+    setSaving(true);
+    for (const item of scanResult.items) {
+      await supabase.from("accounts").insert({
+        type: "expense",
+        category: item.category,
+        description: item.description,
+        amount: Math.round(item.amount),
+        date: newDate,
+      });
+    }
+    setSaving(false);
+    setSaved(true);
+    setScanResult(null);
+    setTimeout(() => setSaved(false), 3000);
+    fetchTransactions();
+  }
 
   async function fetchTransactions() {
     setLoading(true);
@@ -193,6 +273,7 @@ export default function AccountsPage() {
           <button style={tabBtn(activeTab === "overview")}     onClick={() => setActiveTab("overview")}>📊 Overview</button>
           <button style={tabBtn(activeTab === "transactions")} onClick={() => setActiveTab("transactions")}>📋 Transactions</button>
           <button style={tabBtn(activeTab === "add")}          onClick={() => setActiveTab("add")}>+ Add Entry</button>
+          <button style={tabBtn(activeTab === "receipts")}     onClick={() => setActiveTab("receipts")}>🧾 Receipts</button>
         </div>
 
         {/* ── OVERVIEW TAB ── */}
@@ -326,6 +407,131 @@ export default function AccountsPage() {
                   <p style={{ fontFamily: FD, fontSize: "20px", color: C.white }}>
                     Net: TT${filtered.filter(t => t.type === "income").reduce((s, t) => s + t.amount, 0) - filtered.filter(t => t.type === "expense").reduce((s, t) => s + t.amount, 0)}
                   </p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── RECEIPTS TAB ── */}
+        {activeTab === "receipts" && (
+          <div style={{ maxWidth: "640px" }}>
+            {/* Tab toggle */}
+            <div style={{ display: "flex", gap: "8px", marginBottom: "24px" }}>
+              <button style={tabBtn(receiptTab === "scan")}   onClick={() => setReceiptTab("scan")}>📷 Scan Receipt</button>
+              <button style={tabBtn(receiptTab === "manual")} onClick={() => setReceiptTab("manual")}>✏️ Enter Manually</button>
+            </div>
+
+            {/* SCAN TAB */}
+            {receiptTab === "scan" && (
+              <div style={{ backgroundColor: C.white, borderRadius: "4px", border: `1px solid ${C.border}`, padding: "32px" }}>
+                <h2 style={{ fontFamily: FD, fontSize: "22px", color: C.black, marginBottom: "8px" }}>Scan a Receipt</h2>
+                <p style={{ fontSize: "13px", color: C.muted, marginBottom: "24px" }}>Take a photo of your receipt and Claude AI will automatically extract all the items and amounts.</p>
+
+                <div>
+                  <label style={{ fontFamily: FB, fontSize: "11px", fontWeight: "700", letterSpacing: "0.1em", textTransform: "uppercase" as const, color: C.muted, display: "block", marginBottom: "8px" }}>Receipt Date</label>
+                  <input type="date" value={newDate} onChange={e => setNewDate(e.target.value)} style={{ width: "100%", padding: "12px 14px", borderRadius: "4px", border: `1px solid ${C.border}`, fontSize: "14px", fontFamily: FB, boxSizing: "border-box" as const, marginBottom: "16px" }} />
+                </div>
+
+                {/* Upload area */}
+                <label style={{ display: "block", border: `2px dashed ${C.border}`, borderRadius: "4px", padding: "40px 20px", textAlign: "center" as const, cursor: "pointer", backgroundColor: "#FAFAF8", marginBottom: "16px" }}>
+                  <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) scanReceipt(f); }} />
+                  {scanning ? (
+                    <div>
+                      <p style={{ fontSize: "32px", marginBottom: "8px" }}>🔍</p>
+                      <p style={{ fontFamily: FD, fontSize: "16px", color: C.black, marginBottom: "4px" }}>Reading receipt...</p>
+                      <p style={{ fontSize: "12px", color: C.muted }}>Claude AI is extracting the items</p>
+                    </div>
+                  ) : (
+                    <div>
+                      <p style={{ fontSize: "40px", marginBottom: "8px" }}>📷</p>
+                      <p style={{ fontFamily: FD, fontSize: "16px", color: C.black, marginBottom: "4px" }}>Tap to upload receipt photo</p>
+                      <p style={{ fontSize: "12px", color: C.muted }}>JPG, PNG or HEIC — take a clear photo of the full receipt</p>
+                    </div>
+                  )}
+                </label>
+
+                {scanError && (
+                  <div style={{ backgroundColor: "#FFECEC", border: "1px solid #F5C6C6", borderRadius: "4px", padding: "14px", fontSize: "13px", color: "#A03030", marginBottom: "16px" }}>
+                    {scanError}
+                  </div>
+                )}
+
+                {/* Scan result */}
+                {scanResult && (
+                  <div>
+                    <div style={{ backgroundColor: "#EAFFF0", border: "1px solid #8FD4A0", borderRadius: "4px", padding: "16px 20px", marginBottom: "16px" }}>
+                      <p style={{ fontSize: "12px", fontWeight: "700", color: "#1A7A3A", letterSpacing: "0.08em", textTransform: "uppercase" as const, marginBottom: "12px" }}>Receipt Scanned Successfully!</p>
+                      <div style={{ display: "grid", gap: "8px" }}>
+                        {scanResult.items.map((item, i) => (
+                          <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid rgba(0,0,0,0.06)", fontSize: "13px" }}>
+                            <div>
+                              <p style={{ fontWeight: "600", color: C.black }}>{item.description}</p>
+                              <p style={{ fontSize: "11px", color: C.muted, marginTop: "2px" }}>{item.category}</p>
+                            </div>
+                            <p style={{ fontWeight: "700", color: "#A03030" }}>TT${item.amount}</p>
+                          </div>
+                        ))}
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "12px", paddingTop: "12px", borderTop: "1px solid rgba(0,0,0,0.1)" }}>
+                        <p style={{ fontWeight: "700", fontSize: "14px", color: C.black }}>Total</p>
+                        <p style={{ fontFamily: FD, fontSize: "20px", color: "#A03030" }}>TT${scanResult.total}</p>
+                      </div>
+                    </div>
+                    {saved ? (
+                      <div style={{ backgroundColor: "#EAFFF0", border: "1px solid #8FD4A0", borderRadius: "4px", padding: "14px", fontSize: "13px", color: "#1A7A3A", textAlign: "center" as const }}>
+                        ✅ All items saved to accounts!
+                      </div>
+                    ) : (
+                      <div style={{ display: "flex", gap: "10px" }}>
+                        <button onClick={saveScanResult} disabled={saving} style={{ flex: 1, backgroundColor: C.gold, color: C.white, padding: "14px", borderRadius: "4px", border: "none", fontFamily: FB, fontWeight: "600", fontSize: "13px", cursor: "pointer", opacity: saving ? 0.7 : 1 }}>
+                          {saving ? "Saving..." : `Save All Items to Accounts`}
+                        </button>
+                        <button onClick={() => setScanResult(null)} style={{ padding: "14px 20px", borderRadius: "4px", border: `1px solid ${C.border}`, backgroundColor: "transparent", fontFamily: FB, fontSize: "13px", cursor: "pointer", color: C.muted }}>
+                          Discard
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* MANUAL TAB — reuse existing add form */}
+            {receiptTab === "manual" && (
+              <div style={{ backgroundColor: C.white, borderRadius: "4px", border: `1px solid ${C.border}`, padding: "32px" }}>
+                <h2 style={{ fontFamily: FD, fontSize: "22px", color: C.black, marginBottom: "24px" }}>Add Receipt Manually</h2>
+                <div style={{ display: "grid", gap: "16px" }}>
+                  <div>
+                    <label style={{ fontFamily: FB, fontSize: "11px", fontWeight: "700", letterSpacing: "0.1em", textTransform: "uppercase" as const, color: C.muted, display: "block", marginBottom: "6px" }}>Category *</label>
+                    <select value={newCategory} onChange={e => setNewCategory(e.target.value)} style={{ width: "100%", padding: "12px 14px", borderRadius: "4px", border: `1px solid ${C.border}`, fontSize: "14px", fontFamily: FB, boxSizing: "border-box" as const }}>
+                      <option value="">Select category...</option>
+                      {EXPENSE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ fontFamily: FB, fontSize: "11px", fontWeight: "700", letterSpacing: "0.1em", textTransform: "uppercase" as const, color: C.muted, display: "block", marginBottom: "6px" }}>Description <span style={{ fontWeight: "400", textTransform: "none" as const, letterSpacing: 0 }}>(optional)</span></label>
+                    <input type="text" value={newDescription} onChange={e => setNewDescription(e.target.value)} placeholder="e.g. Shrimp from market, packaging bags..." style={{ width: "100%", padding: "12px 14px", borderRadius: "4px", border: `1px solid ${C.border}`, fontSize: "14px", fontFamily: FB, boxSizing: "border-box" as const }} />
+                  </div>
+                  <div>
+                    <label style={{ fontFamily: FB, fontSize: "11px", fontWeight: "700", letterSpacing: "0.1em", textTransform: "uppercase" as const, color: C.muted, display: "block", marginBottom: "6px" }}>Amount (TT$) *</label>
+                    <input type="number" value={newAmount} onChange={e => setNewAmount(e.target.value)} placeholder="0" style={{ width: "100%", padding: "12px 14px", borderRadius: "4px", border: `1px solid ${C.border}`, fontSize: "14px", fontFamily: FB, boxSizing: "border-box" as const }} />
+                  </div>
+                  <div>
+                    <label style={{ fontFamily: FB, fontSize: "11px", fontWeight: "700", letterSpacing: "0.1em", textTransform: "uppercase" as const, color: C.muted, display: "block", marginBottom: "6px" }}>Date *</label>
+                    <input type="date" value={newDate} onChange={e => setNewDate(e.target.value)} style={{ width: "100%", padding: "12px 14px", borderRadius: "4px", border: `1px solid ${C.border}`, fontSize: "14px", fontFamily: FB, boxSizing: "border-box" as const }} />
+                  </div>
+                  {saved && (
+                    <div style={{ backgroundColor: "#EAFFF0", border: "1px solid #8FD4A0", borderRadius: "4px", padding: "12px 16px", fontSize: "13px", color: "#1A7A3A" }}>
+                      ✅ Receipt saved successfully!
+                    </div>
+                  )}
+                  <button onClick={() => {
+                    setNewType("expense");
+                    addTransaction();
+                  }} disabled={saving} style={{ backgroundColor: C.gold, color: C.white, padding: "14px", borderRadius: "4px", border: "none", fontFamily: FB, fontWeight: "600", fontSize: "14px", cursor: "pointer", opacity: saving ? 0.7 : 1 }}>
+                    {saving ? "Saving..." : "Save Receipt"}
+                  </button>
                 </div>
               </div>
             )}
