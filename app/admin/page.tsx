@@ -49,6 +49,24 @@ export default function AdminPage() {
   const [markingComplete, setMarkingComplete] = useState(false);
   const [search,    setSearch]   = useState("");
 
+  // Order editing
+  const [editingOrder, setEditingOrder] = useState<string | null>(null);
+  const [editName,     setEditName]     = useState("");
+  const [editPhone,    setEditPhone]    = useState("");
+  const [editEmail,    setEditEmail]    = useState("");
+  const [editAddress,  setEditAddress]  = useState("");
+  const [editNotes,    setEditNotes]    = useState("");
+  const [editTotal,    setEditTotal]    = useState("");
+  const [editFulfill,  setEditFulfill]  = useState<"delivery" | "pickup">("pickup");
+  const [editSaving,   setEditSaving]   = useState(false);
+
+  // Quick expenditure
+  const [quickExpDesc,   setQuickExpDesc]   = useState("");
+  const [quickExpAmount, setQuickExpAmount] = useState("");
+  const [quickExpCat,    setQuickExpCat]    = useState("Ingredients");
+  const [quickExpSaving, setQuickExpSaving] = useState(false);
+  const [quickExpSaved,  setQuickExpSaved]  = useState(false);
+
   // Settings
   const [ordersOpen, setOrdersOpen] = useState(true);
   const [menuItems, setMenuItems] = useState<Record<string, boolean>>({
@@ -283,6 +301,58 @@ export default function AdminPage() {
     const newEntry = { week: weekLabel, revenue: weekRevenue, orders: activeIds.length };
     setRevenueHistory(prev => [newEntry, ...prev.slice(0, 11)]);
     localStorage.setItem("revenue_history", JSON.stringify([newEntry, ...revenueHistory.slice(0, 11)]));
+  }
+
+  function startEdit(order: Order) {
+    setEditingOrder(order.id);
+    setEditName(order.name);
+    setEditPhone(order.phone);
+    setEditEmail(order.email || "");
+    setEditAddress(order.address || "");
+    setEditNotes(order.notes || "");
+    setEditTotal(String(order.total));
+    setEditFulfill(order.fulfillment);
+  }
+
+  async function saveEdit(id: string) {
+    setEditSaving(true);
+    await supabase.from("orders").update({
+      name:        editName.trim(),
+      phone:       editPhone.trim(),
+      email:       editEmail.trim() || null,
+      address:     editAddress.trim() || null,
+      notes:       editNotes.trim() || null,
+      total:       Number(editTotal),
+      fulfillment: editFulfill,
+    }).eq("id", id);
+    setOrders(prev => prev.map(o => o.id === id ? {
+      ...o,
+      name:        editName.trim(),
+      phone:       editPhone.trim(),
+      email:       editEmail.trim() || "",
+      address:     editAddress.trim() || undefined,
+      notes:       editNotes.trim() || undefined,
+      total:       Number(editTotal),
+      fulfillment: editFulfill,
+    } : o));
+    setEditSaving(false);
+    setEditingOrder(null);
+  }
+
+  async function addQuickExpenditure() {
+    if (!quickExpAmount || isNaN(Number(quickExpAmount))) { alert("Please enter a valid amount."); return; }
+    setQuickExpSaving(true);
+    await supabase.from("accounts").insert({
+      type:        "expense",
+      category:    quickExpCat,
+      description: quickExpDesc.trim() || null,
+      amount:      Math.round(Number(quickExpAmount)),
+      date:        new Date().toISOString().split("T")[0],
+    });
+    setQuickExpSaving(false);
+    setQuickExpSaved(true);
+    setQuickExpDesc(""); setQuickExpAmount(""); setQuickExpCat("Ingredients");
+    setTimeout(() => setQuickExpSaved(false), 3000);
   }
 
   async function fetchOrders() {
@@ -688,6 +758,32 @@ export default function AdminPage() {
           </div>
         )}
 
+        {/* ── QUICK EXPENDITURE ── */}
+        <div style={{ backgroundColor: C.white, borderRadius: "4px", border: `1px solid ${C.border}`, padding: "24px", marginBottom: "24px" }}>
+          <p style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "0.1em", textTransform: "uppercase" as const, color: C.gold, marginBottom: "6px" }}>Quick Add</p>
+          <h3 style={{ fontFamily: FONT_DISPLAY, fontSize: "20px", fontWeight: "400", color: C.black, marginBottom: "20px" }}>Log an Expense</h3>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "12px" }}>
+            <div>
+              <label style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "0.08em", textTransform: "uppercase" as const, color: C.muted, display: "block", marginBottom: "6px" }}>Category</label>
+              <select value={quickExpCat} onChange={e => setQuickExpCat(e.target.value)} style={{ width: "100%", padding: "10px 12px", borderRadius: "4px", border: `1px solid ${C.border}`, fontSize: "13px", fontFamily: FONT_BODY }}>
+                {["Ingredients","Packaging","Gas & Transport","Equipment","Marketing","Other"].map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "0.08em", textTransform: "uppercase" as const, color: C.muted, display: "block", marginBottom: "6px" }}>Amount (TT$)</label>
+              <input type="number" value={quickExpAmount} onChange={e => setQuickExpAmount(e.target.value)} placeholder="0" style={{ width: "100%", padding: "10px 12px", borderRadius: "4px", border: `1px solid ${C.border}`, fontSize: "13px", fontFamily: FONT_BODY, boxSizing: "border-box" as const }} />
+            </div>
+          </div>
+          <div style={{ marginBottom: "12px" }}>
+            <label style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "0.08em", textTransform: "uppercase" as const, color: C.muted, display: "block", marginBottom: "6px" }}>Description <span style={{ fontWeight: "400", textTransform: "none" as const, letterSpacing: 0 }}>(optional)</span></label>
+            <input type="text" value={quickExpDesc} onChange={e => setQuickExpDesc(e.target.value)} placeholder="e.g. Shrimp from market, packaging bags..." style={{ width: "100%", padding: "10px 12px", borderRadius: "4px", border: `1px solid ${C.border}`, fontSize: "13px", fontFamily: FONT_BODY, boxSizing: "border-box" as const }} />
+          </div>
+          {quickExpSaved && <p style={{ fontSize: "13px", color: "#1A7A3A", marginBottom: "10px" }}>✅ Expense saved to accounts!</p>}
+          <button onClick={addQuickExpenditure} disabled={quickExpSaving} style={{ backgroundColor: C.gold, color: C.white, padding: "10px 24px", borderRadius: "4px", border: "none", fontFamily: FONT_BODY, fontWeight: "600", fontSize: "13px", cursor: "pointer", opacity: quickExpSaving ? 0.7 : 1 }}>
+            {quickExpSaving ? "Saving..." : "Add Expense"}
+          </button>
+        </div>
+
         {/* ── REVENUE HISTORY ── */}
         {revenueHistory.length > 0 && (
           <div style={{ backgroundColor: C.white, borderRadius: "4px", border: `1px solid ${C.border}`, padding: "24px", marginBottom: "24px" }}>
@@ -813,6 +909,11 @@ export default function AdminPage() {
                       )}
 
                       <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" as const }}>
+                        {editingOrder !== order.id && (
+                          <button onClick={() => startEdit(order)} style={{ backgroundColor: C.white, color: C.charcoal, padding: "11px 22px", borderRadius: "4px", border: `1px solid ${C.border}`, fontFamily: FONT_BODY, fontWeight: "600", fontSize: "13px", cursor: "pointer" }}>
+                            ✏️ Edit Order
+                          </button>
+                        )}
                         {cfg.next && (
                           <button onClick={() => advanceStatus(order.id, order.status)} style={{ backgroundColor: C.gold, color: C.white, padding: "11px 22px", borderRadius: "4px", border: "none", fontFamily: FONT_BODY, fontWeight: "600", fontSize: "13px", cursor: "pointer" }}>
                             {cfg.nextLabel}
@@ -833,6 +934,56 @@ export default function AdminPage() {
                           🗑 Delete Order
                         </button>
                       </div>
+
+                      {/* Edit form */}
+                      {editingOrder === order.id && (
+                        <div style={{ marginTop: "20px", padding: "20px", backgroundColor: C.cream, borderRadius: "4px", border: `1px solid ${C.border}` }}>
+                          <p style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "0.1em", textTransform: "uppercase" as const, color: C.gold, marginBottom: "16px" }}>Edit Order</p>
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "12px" }}>
+                            <div>
+                              <label style={{ fontSize: "11px", fontWeight: "700", color: C.muted, display: "block", marginBottom: "4px", textTransform: "uppercase" as const, letterSpacing: "0.08em" }}>Name</label>
+                              <input value={editName} onChange={e => setEditName(e.target.value)} style={{ width: "100%", padding: "9px 12px", borderRadius: "4px", border: `1px solid ${C.border}`, fontSize: "13px", fontFamily: FONT_BODY, boxSizing: "border-box" as const }} />
+                            </div>
+                            <div>
+                              <label style={{ fontSize: "11px", fontWeight: "700", color: C.muted, display: "block", marginBottom: "4px", textTransform: "uppercase" as const, letterSpacing: "0.08em" }}>Phone</label>
+                              <input value={editPhone} onChange={e => setEditPhone(e.target.value)} style={{ width: "100%", padding: "9px 12px", borderRadius: "4px", border: `1px solid ${C.border}`, fontSize: "13px", fontFamily: FONT_BODY, boxSizing: "border-box" as const }} />
+                            </div>
+                            <div>
+                              <label style={{ fontSize: "11px", fontWeight: "700", color: C.muted, display: "block", marginBottom: "4px", textTransform: "uppercase" as const, letterSpacing: "0.08em" }}>Email</label>
+                              <input value={editEmail} onChange={e => setEditEmail(e.target.value)} style={{ width: "100%", padding: "9px 12px", borderRadius: "4px", border: `1px solid ${C.border}`, fontSize: "13px", fontFamily: FONT_BODY, boxSizing: "border-box" as const }} />
+                            </div>
+                            <div>
+                              <label style={{ fontSize: "11px", fontWeight: "700", color: C.muted, display: "block", marginBottom: "4px", textTransform: "uppercase" as const, letterSpacing: "0.08em" }}>Total (TT$)</label>
+                              <input type="number" value={editTotal} onChange={e => setEditTotal(e.target.value)} style={{ width: "100%", padding: "9px 12px", borderRadius: "4px", border: `1px solid ${C.border}`, fontSize: "13px", fontFamily: FONT_BODY, boxSizing: "border-box" as const }} />
+                            </div>
+                          </div>
+                          <div style={{ marginBottom: "12px" }}>
+                            <label style={{ fontSize: "11px", fontWeight: "700", color: C.muted, display: "block", marginBottom: "4px", textTransform: "uppercase" as const, letterSpacing: "0.08em" }}>Fulfillment</label>
+                            <div style={{ display: "flex", gap: "8px" }}>
+                              <button onClick={() => setEditFulfill("pickup")} style={{ flex: 1, padding: "9px", borderRadius: "4px", border: editFulfill === "pickup" ? `2px solid ${C.gold}` : `1px solid ${C.border}`, backgroundColor: editFulfill === "pickup" ? "#F5EDD8" : C.white, cursor: "pointer", fontFamily: FONT_BODY, fontSize: "13px", fontWeight: editFulfill === "pickup" ? "700" : "400" }}>🏠 Pickup</button>
+                              <button onClick={() => setEditFulfill("delivery")} style={{ flex: 1, padding: "9px", borderRadius: "4px", border: editFulfill === "delivery" ? `2px solid ${C.gold}` : `1px solid ${C.border}`, backgroundColor: editFulfill === "delivery" ? "#F5EDD8" : C.white, cursor: "pointer", fontFamily: FONT_BODY, fontSize: "13px", fontWeight: editFulfill === "delivery" ? "700" : "400" }}>🚗 Delivery</button>
+                            </div>
+                          </div>
+                          {editFulfill === "delivery" && (
+                            <div style={{ marginBottom: "12px" }}>
+                              <label style={{ fontSize: "11px", fontWeight: "700", color: C.muted, display: "block", marginBottom: "4px", textTransform: "uppercase" as const, letterSpacing: "0.08em" }}>Delivery Address</label>
+                              <input value={editAddress} onChange={e => setEditAddress(e.target.value)} style={{ width: "100%", padding: "9px 12px", borderRadius: "4px", border: `1px solid ${C.border}`, fontSize: "13px", fontFamily: FONT_BODY, boxSizing: "border-box" as const }} />
+                            </div>
+                          )}
+                          <div style={{ marginBottom: "16px" }}>
+                            <label style={{ fontSize: "11px", fontWeight: "700", color: C.muted, display: "block", marginBottom: "4px", textTransform: "uppercase" as const, letterSpacing: "0.08em" }}>Notes</label>
+                            <textarea value={editNotes} onChange={e => setEditNotes(e.target.value)} rows={2} style={{ width: "100%", padding: "9px 12px", borderRadius: "4px", border: `1px solid ${C.border}`, fontSize: "13px", fontFamily: FONT_BODY, boxSizing: "border-box" as const, resize: "vertical" }} />
+                          </div>
+                          <div style={{ display: "flex", gap: "10px" }}>
+                            <button onClick={() => saveEdit(order.id)} disabled={editSaving} style={{ backgroundColor: C.gold, color: C.white, padding: "10px 24px", borderRadius: "4px", border: "none", fontFamily: FONT_BODY, fontWeight: "600", fontSize: "13px", cursor: "pointer", opacity: editSaving ? 0.7 : 1 }}>
+                              {editSaving ? "Saving..." : "Save Changes"}
+                            </button>
+                            <button onClick={() => setEditingOrder(null)} style={{ backgroundColor: C.white, color: C.muted, padding: "10px 20px", borderRadius: "4px", border: `1px solid ${C.border}`, fontFamily: FONT_BODY, fontSize: "13px", cursor: "pointer" }}>
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
