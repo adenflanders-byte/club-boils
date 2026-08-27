@@ -29,6 +29,7 @@ export default function AccountsPage() {
   const [pwError,      setPwError]      = useState(false);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading,      setLoading]      = useState(false);
+  const [orderRevenue, setOrderRevenue] = useState<{date: string, amount: number, description: string}[]>([]);
   const [activeTab,    setActiveTab]    = useState<"overview" | "transactions" | "add" | "receipts">("overview");
   const [viewMode,     setViewMode]     = useState<"weekly" | "monthly">("weekly");
   const [filterType,   setFilterType]   = useState<"all" | "income" | "expense">("all");
@@ -123,6 +124,21 @@ Return ONLY a JSON object like this, no other text:
     fetchTransactions();
   }
 
+  async function fetchOrderRevenue() {
+    const { data } = await supabase
+      .from("orders")
+      .select("created_at, total, package, status")
+      .neq("status", "cancelled")
+      .order("created_at", { ascending: false });
+    if (data) {
+      setOrderRevenue(data.map((o: any) => ({
+        date: o.created_at.split("T")[0],
+        amount: o.total,
+        description: o.package,
+      })));
+    }
+  }
+
   async function fetchTransactions() {
     setLoading(true);
     const { data } = await supabase.from("accounts").select("*").order("date", { ascending: false });
@@ -130,7 +146,7 @@ Return ONLY a JSON object like this, no other text:
     setLoading(false);
   }
 
-  useEffect(() => { if (authed) fetchTransactions(); }, [authed]);
+  useEffect(() => { if (authed) { fetchTransactions(); fetchOrderRevenue(); } }, [authed]);
 
   function handleLogin() {
     if (pwInput === PASSWORD) { setAuthed(true); setPwError(false); }
@@ -175,11 +191,17 @@ Return ONLY a JSON object like this, no other text:
   }
 
   function groupTransactions() {
-    const groups: Record<string, Transaction[]> = {};
+    const groups: Record<string, { transactions: Transaction[], orderRevenue: number }> = {};
     transactions.forEach(t => {
       const key = viewMode === "weekly" ? getWeekKey(t.date) : getMonthKey(t.date);
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(t);
+      if (!groups[key]) groups[key] = { transactions: [], orderRevenue: 0 };
+      groups[key].transactions.push(t);
+    });
+    // Add order revenue to groups
+    orderRevenue.forEach(o => {
+      const key = viewMode === "weekly" ? getWeekKey(o.date) : getMonthKey(o.date);
+      if (!groups[key]) groups[key] = { transactions: [], orderRevenue: 0 };
+      groups[key].orderRevenue += o.amount;
     });
     return Object.entries(groups).sort((a, b) => b[0].localeCompare(a[0]));
   }
@@ -195,10 +217,12 @@ Return ONLY a JSON object like this, no other text:
     return `Week of ${d.toLocaleDateString("en-TT", { month: "short", day: "numeric" })} – ${end.toLocaleDateString("en-TT", { month: "short", day: "numeric", year: "numeric" })}`;
   }
 
-  const totalIncome   = transactions.filter(t => t.type === "income").reduce((s, t) => s + t.amount, 0);
-  const totalExpenses = transactions.filter(t => t.type === "expense").reduce((s, t) => s + t.amount, 0);
-  const netProfit     = totalIncome - totalExpenses;
-  const margin        = totalIncome > 0 ? ((netProfit / totalIncome) * 100).toFixed(1) : "0";
+  const orderRevenueTotal = orderRevenue.reduce((s, o) => s + o.amount, 0);
+  const manualIncome      = transactions.filter(t => t.type === "income").reduce((s, t) => s + t.amount, 0);
+  const totalIncome       = orderRevenueTotal + manualIncome;
+  const totalExpenses     = transactions.filter(t => t.type === "expense").reduce((s, t) => s + t.amount, 0);
+  const netProfit         = totalIncome - totalExpenses;
+  const margin            = totalIncome > 0 ? ((netProfit / totalIncome) * 100).toFixed(1) : "0";
 
   const expenseByCategory = EXPENSE_CATEGORIES.map(cat => ({
     cat,
@@ -286,19 +310,41 @@ Return ONLY a JSON object like this, no other text:
             </div>
 
             {/* Summary cards */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "12px", marginBottom: "32px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "12px", marginBottom: "24px" }}>
               {[
-                { label: "Total Revenue",  value: `TT$${totalIncome}`,   color: C.gold    },
-                { label: "Total Expenses", value: `TT$${totalExpenses}`, color: "#A03030" },
-                { label: "Net Profit",     value: `${netProfit >= 0 ? "+" : ""}TT$${netProfit}`, color: netProfit >= 0 ? "#1A7A3A" : "#A03030" },
-                { label: "Profit Margin",  value: `${margin}%`,          color: C.charcoal },
+                { label: "Order Revenue",  value: `TT$${orderRevenueTotal}`, color: C.gold, sub: `${orderRevenue.length} orders` },
+                { label: "Other Income",   value: `TT$${manualIncome}`,      color: C.gold, sub: "manual entries" },
+                { label: "Total Revenue",  value: `TT$${totalIncome}`,       color: C.gold, sub: "combined" },
+                { label: "Total Expenses", value: `TT$${totalExpenses}`,     color: "#A03030", sub: "all categories" },
+                { label: "Net Profit",     value: `${netProfit >= 0 ? "+" : ""}TT$${netProfit}`, color: netProfit >= 0 ? "#1A7A3A" : "#A03030", sub: netProfit >= 0 ? "profit" : "loss" },
+                { label: "Profit Margin",  value: `${margin}%`,              color: C.charcoal, sub: "of revenue" },
               ].map(card => (
                 <div key={card.label} style={{ backgroundColor: C.white, borderRadius: "4px", border: `1px solid ${C.border}`, padding: "20px" }}>
                   <p style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "0.1em", textTransform: "uppercase" as const, color: C.muted, marginBottom: "8px" }}>{card.label}</p>
                   <p style={{ fontFamily: FD, fontSize: "24px", color: card.color }}>{card.value}</p>
+                  <p style={{ fontSize: "11px", color: C.muted, marginTop: "4px" }}>{card.sub}</p>
                 </div>
               ))}
             </div>
+
+            {/* Order revenue breakdown */}
+            {orderRevenue.length > 0 && (
+              <div style={{ backgroundColor: C.white, borderRadius: "4px", border: `1px solid ${C.border}`, padding: "20px", marginBottom: "24px" }}>
+                <p style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "0.1em", textTransform: "uppercase" as const, color: C.gold, marginBottom: "12px" }}>Revenue from Orders</p>
+                <div style={{ display: "grid", gap: "6px", maxHeight: "240px", overflowY: "auto" as const }}>
+                  {orderRevenue.slice(0, 10).map((o, i) => (
+                    <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: `1px solid ${C.border}`, fontSize: "13px" }}>
+                      <div>
+                        <p style={{ fontWeight: "500", color: C.charcoal }}>{o.description}</p>
+                        <p style={{ fontSize: "11px", color: C.muted, marginTop: "2px" }}>{new Date(o.date).toLocaleDateString("en-TT", { month: "short", day: "numeric", year: "numeric" })}</p>
+                      </div>
+                      <p style={{ fontWeight: "700", color: "#1A7A3A", whiteSpace: "nowrap" as const }}>+TT${o.amount}</p>
+                    </div>
+                  ))}
+                  {orderRevenue.length > 10 && <p style={{ fontSize: "12px", color: C.muted, textAlign: "center" as const, padding: "8px" }}>+{orderRevenue.length - 10} more orders</p>}
+                </div>
+              </div>
+            )}
 
             {/* Expenses by category */}
             {expenseByCategory.length > 0 && (
