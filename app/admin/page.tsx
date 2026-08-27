@@ -9,12 +9,12 @@ interface Order {
   created_at: string;
   name: string;
   phone: string;
-  email: string;
+  email: string | null;
   package: string;
   details: string[];
   fulfillment: "delivery" | "pickup";
-  address?: string;
-  notes?: string;
+  address?: string | null;
+  notes?: string | null;
   total: number;
   status: OrderStatus;
 }
@@ -329,9 +329,9 @@ export default function AdminPage() {
       ...o,
       name:        editName.trim(),
       phone:       editPhone.trim(),
-      email:       editEmail.trim() || "",
-      address:     editAddress.trim() || undefined,
-      notes:       editNotes.trim() || undefined,
+      email:       editEmail.trim() || null,
+      address:     editAddress.trim() || null,
+      notes:       editNotes.trim() || null,
       total:       Number(editTotal),
       fulfillment: editFulfill,
     } : o));
@@ -723,14 +723,17 @@ export default function AdminPage() {
               activeOrders.forEach(order => {
                 (order.details || []).forEach((detail: string) => {
                   // detail format: "1x Club Solo (Shrimp) - TT$130"
-                  const match = detail.match(/^(\d+)x\s(.+?)\s[\(\-]/);
-                  if (match) {
-                    const qty  = parseInt(match[1]);
-                    const name = match[2].trim();
-                    itemCounts[name] = (itemCounts[name] || 0) + qty;
+                  // Try: quantity + name + (variant)
+                  const matchWithVariant = detail.match(/^(\d+)x\s(.+?)\s\(([^)]+)\)/);
+                  if (matchWithVariant) {
+                    const qty     = parseInt(matchWithVariant[1]);
+                    const name    = matchWithVariant[2].trim();
+                    const variant = matchWithVariant[3].trim();
+                    const key     = `${name} — ${variant}`;
+                    itemCounts[key] = (itemCounts[key] || 0) + qty;
                   } else {
-                    // fallback - use full detail without price
-                    const clean = detail.replace(/\s*-\s*TT\$[\d]+$/, "").trim();
+                    // fallback - strip price and use full name
+                    const clean = detail.replace(/\s*-\s*TT\$[\d,]+$/, "").replace(/^\d+x\s/, "").trim();
                     itemCounts[clean] = (itemCounts[clean] || 0) + 1;
                   }
                 });
