@@ -16,11 +16,12 @@ const EXPENSE_CATEGORIES = ["Ingredients", "Packaging", "Gas & Transport", "Equi
 const INCOME_CATEGORIES  = ["Orders", "Other Income"];
 
 const C = {
-  cream: "#F7F3EC", white: "#FFFFFF", gold: "#B8922A", goldPale: "#F5EDD8",
-  black: "#0F0E0C", charcoal: "#2C2A26", muted: "#7A7368", border: "#E4D9C6",
+  cream: "#FAF8F3", white: "#FFFFFF", gold: "#C4952A", goldPale: "rgba(196,149,42,0.12)",
+  black: "#0A0A0A", charcoal: "#1C1C1C", muted: "#6B6560", border: "rgba(196,149,42,0.2)",
 };
-const FD = `'Georgia', 'Times New Roman', serif`;
-const FB = `'Helvetica Neue', Arial, sans-serif`;
+const FD = `'Cinzel', serif`;
+const FB = `'Inter', sans-serif`;
+const GOOGLE_FONTS = `@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@300;400;500;600;700&display=swap');`;
 const PASSWORD = "anderson56$";
 
 export default function AccountsPage() {
@@ -203,9 +204,7 @@ Return ONLY a JSON object like this, no other text:
       if (!groups[key]) groups[key] = { transactions: [], orderRevenue: 0 };
       groups[key].orderRevenue += o.amount;
     });
-    return Object.entries(groups)
-      .sort((a, b) => b[0].localeCompare(a[0]))
-      .map(([key, value]) => [key, value.transactions, value.orderRevenue] as [string, Transaction[], number]);
+    return Object.entries(groups).sort((a, b) => b[0].localeCompare(a[0]));
   }
 
   function formatPeriod(key: string) {
@@ -247,10 +246,11 @@ Return ONLY a JSON object like this, no other text:
     textTransform: "uppercase" as const, color: C.muted, display: "block", marginBottom: "6px",
   };
   const tabBtn = (active: boolean): React.CSSProperties => ({
-    padding: "10px 20px", borderRadius: "4px", border: "none", cursor: "pointer",
-    fontFamily: FB, fontSize: "12px", fontWeight: active ? "700" : "400",
-    backgroundColor: active ? C.black : C.white,
-    color: active ? C.white : C.charcoal, transition: "all 0.15s",
+    padding: "9px 20px", borderRadius: "20px", border: active ? "none" : `1px solid ${C.border}`,
+    cursor: "pointer", fontFamily: FB, fontSize: "11px", fontWeight: active ? "700" : "500",
+    letterSpacing: "0.06em",
+    backgroundColor: active ? C.black : "transparent",
+    color: active ? C.white : C.muted, transition: "all 0.2s",
   });
   const goldBtn: React.CSSProperties = {
     backgroundColor: C.gold, color: C.white, padding: "12px 24px", borderRadius: "4px",
@@ -260,20 +260,26 @@ Return ONLY a JSON object like this, no other text:
   // ── Login ─────────────────────────────────────────────
   if (!authed) {
     return (
-      <main style={{ backgroundColor: C.cream, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FB, padding: "24px" }}>
-        <div style={{ backgroundColor: C.white, borderRadius: "4px", border: `1px solid ${C.border}`, padding: "48px 40px", maxWidth: "400px", width: "100%", textAlign: "center" as const }}>
-          <p style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "0.16em", textTransform: "uppercase" as const, color: C.gold, marginBottom: "12px" }}>Accounts Access</p>
-          <h1 style={{ fontFamily: FD, fontSize: "26px", fontWeight: "400", color: C.black, marginBottom: "8px" }}>The Club Boils</h1>
-          <p style={{ color: C.muted, fontSize: "14px", marginBottom: "32px" }}>Business Accounts Dashboard</p>
+      <>
+      <style>{`${GOOGLE_FONTS} * { box-sizing: border-box; } @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }`}</style>
+      <main style={{ backgroundColor: C.black, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FB, padding: "24px", position: "relative" as const, overflow: "hidden" }}>
+        <div style={{ position: "absolute", top: "20%", left: "50%", transform: "translateX(-50%)", width: "600px", height: "400px", background: "radial-gradient(ellipse, rgba(196,149,42,0.08) 0%, transparent 70%)", pointerEvents: "none" }} />
+        <div style={{ backgroundColor: "rgba(255,255,255,0.03)", backdropFilter: "blur(20px)", borderRadius: "8px", border: `1px solid ${C.border}`, padding: "52px 44px", maxWidth: "420px", width: "100%", textAlign: "center" as const, animation: "fadeUp 0.6s ease both", boxShadow: "0 32px 64px rgba(0,0,0,0.4)" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "12px", marginBottom: "8px" }}>
+            <span style={{ color: C.gold, fontSize: "28px" }}>♣</span>
+            <h1 style={{ fontFamily: FD, fontSize: "22px", fontWeight: "600", color: C.white, letterSpacing: "0.06em" }}>THE CLUB BOILS</h1>
+          </div>
+          <p style={{ fontSize: "10px", fontWeight: "700", letterSpacing: "0.22em", textTransform: "uppercase" as const, color: C.gold, marginBottom: "40px" }}>Business Accounts</p>
           <div style={{ textAlign: "left" as const, marginBottom: "14px" }}>
             <label style={labelStyle}>Password</label>
             <input type="password" value={pwInput} onChange={e => { setPwInput(e.target.value); setPwError(false); }} onKeyDown={e => e.key === "Enter" && handleLogin()} placeholder="Enter password"
               style={{ ...inputStyle, border: pwError ? "1px solid #C0392B" : `1px solid ${C.border}` }} />
             {pwError && <p style={{ color: "#C0392B", fontSize: "12px", marginTop: "6px" }}>Incorrect password.</p>}
           </div>
-          <button onClick={handleLogin} style={{ ...goldBtn, width: "100%" }}>Sign In</button>
+          <button onClick={handleLogin} style={{ background: `linear-gradient(135deg, ${C.gold}, #E8B84B)`, color: C.black, width: "100%", padding: "14px", borderRadius: "4px", border: "none", fontFamily: FB, fontWeight: "700", fontSize: "12px", letterSpacing: "0.12em", cursor: "pointer", textTransform: "uppercase" as const, boxShadow: "0 4px 20px rgba(196,149,42,0.3)" }}>Sign In</button>
         </div>
       </main>
+      </>
     );
   }
 
@@ -281,14 +287,16 @@ Return ONLY a JSON object like this, no other text:
     <main style={{ backgroundColor: C.cream, minHeight: "100vh", fontFamily: FB }}>
 
       {/* Header */}
-      <header style={{ backgroundColor: C.black, padding: "0 32px", display: "flex", justifyContent: "space-between", alignItems: "center", height: "60px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-          <span style={{ fontFamily: FD, fontSize: "18px", color: C.white }}>The Club Boils</span>
-          <span style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "0.12em", color: C.gold, textTransform: "uppercase" as const }}>Accounts</span>
+      <style>{`${GOOGLE_FONTS} * { box-sizing: border-box; } @keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } } .acct-card { transition: box-shadow 0.2s, transform 0.2s; } .acct-card:hover { box-shadow: 0 8px 32px rgba(0,0,0,0.1); transform: translateY(-1px); }`}</style>
+      <header style={{ backgroundColor: C.black, padding: "0 clamp(16px, 3vw, 32px)", display: "flex", justifyContent: "space-between", alignItems: "center", height: "64px", position: "sticky", top: 0, zIndex: 100, borderBottom: `1px solid ${C.border}` }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <span style={{ color: C.gold, fontSize: "20px" }}>♣</span>
+          <span style={{ fontFamily: FD, fontSize: "16px", fontWeight: "600", color: C.white, letterSpacing: "0.06em" }}>THE CLUB BOILS</span>
+          <span style={{ fontSize: "9px", fontWeight: "700", letterSpacing: "0.16em", color: C.gold, textTransform: "uppercase" as const, backgroundColor: "rgba(196,149,42,0.15)", padding: "3px 10px", borderRadius: "20px" }}>Accounts</span>
         </div>
-        <div style={{ display: "flex", gap: "10px" }}>
-          <a href="/admin" style={{ backgroundColor: "transparent", border: `1px solid ${C.gold}`, color: C.gold, padding: "7px 16px", borderRadius: "4px", fontSize: "12px", fontFamily: FB, textDecoration: "none", display: "flex", alignItems: "center" }}>← Orders</a>
-          <button onClick={() => setAuthed(false)} style={{ backgroundColor: "transparent", border: "1px solid rgba(255,255,255,0.2)", color: "rgba(255,255,255,0.6)", padding: "7px 16px", borderRadius: "4px", cursor: "pointer", fontSize: "12px", fontFamily: FB }}>Sign Out</button>
+        <div style={{ display: "flex", gap: "8px" }}>
+          <a href="/admin" style={{ backgroundColor: "transparent", border: `1px solid ${C.border}`, color: C.gold, padding: "7px 16px", borderRadius: "4px", fontSize: "11px", fontFamily: FB, textDecoration: "none", letterSpacing: "0.06em", fontWeight: "600" }}>← Orders</a>
+          <button onClick={() => setAuthed(false)} style={{ backgroundColor: "transparent", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.3)", padding: "7px 16px", borderRadius: "4px", cursor: "pointer", fontSize: "11px", fontFamily: FB }}>Sign Out</button>
         </div>
       </header>
 
@@ -374,9 +382,10 @@ Return ONLY a JSON object like this, no other text:
                 <p style={{ color: C.muted, fontSize: "14px" }}>No transactions yet</p>
               ) : (
                 <div style={{ display: "grid", gap: "12px" }}>
-                  {groupTransactions().map(([key, txns]) => {
-                    const inc = txns.filter(t => t.type === "income").reduce((s, t) => s + t.amount, 0);
-                    const exp = txns.filter(t => t.type === "expense").reduce((s, t) => s + t.amount, 0);
+                  {groupTransactions().map(([key, group]) => {
+                    const txns = group.transactions;
+                    const inc = txns.filter((t: Transaction) => t.type === "income").reduce((s: number, t: Transaction) => s + t.amount, 0) + group.orderRevenue;
+                    const exp = txns.filter((t: Transaction) => t.type === "expense").reduce((s: number, t: Transaction) => s + t.amount, 0);
                     const net = inc - exp;
                     return (
                       <div key={key} style={{ padding: "16px 20px", backgroundColor: C.cream, borderRadius: "4px", border: `1px solid ${C.border}` }}>

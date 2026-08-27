@@ -30,11 +30,12 @@ const STATUS_CONFIG: Record<OrderStatus, { label: string; color: string; bg: str
 const PASSWORD = "anderson56$";
 
 const C = {
-  cream: "#F7F3EC", white: "#FFFFFF", gold: "#B8922A",
-  black: "#0F0E0C", charcoal: "#2C2A26", muted: "#7A7368", border: "#E4D9C6",
+  cream: "#FAF8F3", white: "#FFFFFF", gold: "#C4952A", goldDim: "rgba(196,149,42,0.12)",
+  black: "#0A0A0A", charcoal: "#1C1C1C", muted: "#6B6560", border: "rgba(196,149,42,0.2)",
 };
-const FONT_DISPLAY = `'Georgia', 'Times New Roman', serif`;
-const FONT_BODY    = `'Helvetica Neue', Arial, sans-serif`;
+const FONT_DISPLAY = `'Cinzel', serif`;
+const FONT_BODY    = `'Inter', sans-serif`;
+const GOOGLE_FONTS = `@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@300;400;500;600;700&display=swap');`;
 
 export default function AdminPage() {
   const [authed,    setAuthed]   = useState(false);
@@ -460,21 +461,36 @@ export default function AdminPage() {
 
   // ── Dashboard ─────────────────────────────────────────────
   return (
-    <main style={{ backgroundColor: C.cream, minHeight: "100vh", fontFamily: FONT_BODY, color: C.charcoal }}>
+    <>
+      <style>{`
+        ${GOOGLE_FONTS}
+        * { box-sizing: border-box; }
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+        .admin-card { transition: box-shadow 0.2s ease, transform 0.2s ease; }
+        .admin-card:hover { box-shadow: 0 8px 32px rgba(0,0,0,0.1); transform: translateY(-1px); }
+        .order-row { transition: background 0.15s ease; }
+        .order-row:hover { background: rgba(196,149,42,0.04) !important; }
+        .gold-btn { transition: all 0.2s ease; }
+        .gold-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(196,149,42,0.35); }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-thumb { background: ${C.gold}; border-radius: 2px; }
+      `}</style>
+      <main style={{ backgroundColor: C.cream, minHeight: "100vh", fontFamily: FONT_BODY, color: C.charcoal }}>
 
-      <header style={{ backgroundColor: C.black, padding: "0 32px", display: "flex", justifyContent: "space-between", alignItems: "center", height: "60px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-          <span style={{ fontFamily: FONT_DISPLAY, fontSize: "18px", color: C.white }}>The Club Boils</span>
-          <span style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "0.12em", color: C.gold, textTransform: "uppercase" as const }}>Admin</span>
+      <header style={{ backgroundColor: C.black, padding: "0 clamp(16px, 3vw, 32px)", display: "flex", justifyContent: "space-between", alignItems: "center", height: "64px", position: "sticky", top: 0, zIndex: 100, borderBottom: `1px solid ${C.border}`, backdropFilter: "blur(20px)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <span style={{ color: C.gold, fontSize: "20px" }}>♣</span>
+          <span style={{ fontFamily: FONT_DISPLAY, fontSize: "16px", fontWeight: "600", color: C.white, letterSpacing: "0.06em" }}>THE CLUB BOILS</span>
+          <span style={{ fontSize: "9px", fontWeight: "700", letterSpacing: "0.16em", color: C.gold, textTransform: "uppercase" as const, backgroundColor: "rgba(196,149,42,0.15)", padding: "3px 10px", borderRadius: "20px" }}>Admin</span>
         </div>
-        <div style={{ display: "flex", gap: "10px" }}>
-          <a href="/accounts" style={{ backgroundColor: "transparent", border: `1px solid ${C.gold}`, color: C.gold, padding: "7px 16px", borderRadius: "4px", fontSize: "12px", fontFamily: FONT_BODY, textDecoration: "none", display: "inline-flex", alignItems: "center" }}>
+        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+          <a href="/accounts" style={{ backgroundColor: "transparent", border: `1px solid ${C.border}`, color: C.gold, padding: "7px 16px", borderRadius: "4px", fontSize: "11px", fontFamily: FONT_BODY, textDecoration: "none", letterSpacing: "0.06em", fontWeight: "600" }}>
             📊 Accounts
           </a>
-          <button onClick={fetchOrders} style={{ backgroundColor: "transparent", border: `1px solid ${C.gold}`, color: C.gold, padding: "7px 16px", borderRadius: "4px", cursor: "pointer", fontSize: "12px", fontFamily: FONT_BODY }}>
+          <button onClick={fetchOrders} style={{ backgroundColor: "transparent", border: `1px solid ${C.border}`, color: "rgba(255,255,255,0.5)", padding: "7px 16px", borderRadius: "4px", cursor: "pointer", fontSize: "11px", fontFamily: FONT_BODY, letterSpacing: "0.06em" }}>
             ↻ Refresh
           </button>
-          <button onClick={() => setAuthed(false)} style={{ backgroundColor: "transparent", border: "1px solid rgba(255,255,255,0.2)", color: "rgba(255,255,255,0.6)", padding: "7px 16px", borderRadius: "4px", cursor: "pointer", fontSize: "12px", fontFamily: FONT_BODY }}>
+          <button onClick={() => setAuthed(false)} style={{ backgroundColor: "transparent", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.3)", padding: "7px 16px", borderRadius: "4px", cursor: "pointer", fontSize: "11px", fontFamily: FONT_BODY }}>
             Sign Out
           </button>
         </div>
@@ -497,7 +513,7 @@ export default function AdminPage() {
         </div>
 
         {/* ── STORE SETTINGS ── */}
-        <div style={{ backgroundColor: C.white, borderRadius: "4px", border: `1px solid ${C.border}`, padding: "24px", marginBottom: "24px" }}>
+        <div className="admin-card" style={{ backgroundColor: C.white, borderRadius: "6px", border: `1px solid ${C.border}`, padding: "24px", marginBottom: "24px", animation: "fadeUp 0.5s ease both" }}>
           <p style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "0.1em", textTransform: "uppercase" as const, color: C.gold, marginBottom: "6px" }}>Store Settings</p>
           <h3 style={{ fontFamily: FONT_DISPLAY, fontSize: "20px", fontWeight: "400", color: C.black, marginBottom: "20px" }}>Orders & Menu Control</h3>
 
@@ -606,7 +622,7 @@ export default function AdminPage() {
         </div>
 
         {/* ── PENDING REVIEWS ── */}
-        <div style={{ backgroundColor: C.white, borderRadius: "4px", border: `1px solid ${C.border}`, padding: "24px", marginBottom: "24px" }}>
+        <div className="admin-card" style={{ backgroundColor: C.white, borderRadius: "6px", border: `1px solid ${C.border}`, padding: "24px", marginBottom: "24px", animation: "fadeUp 0.5s ease both" }}>
           <p style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "0.1em", textTransform: "uppercase" as const, color: C.gold, marginBottom: "6px" }}>Reviews</p>
           <h3 style={{ fontFamily: FONT_DISPLAY, fontSize: "20px", fontWeight: "400", color: C.black, marginBottom: "20px" }}>
             Pending Approval {pendingReviews.length > 0 && <span style={{ backgroundColor: C.gold, color: C.white, borderRadius: "50%", width: "22px", height: "22px", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "12px", marginLeft: "8px" }}>{pendingReviews.length}</span>}
@@ -692,7 +708,7 @@ export default function AdminPage() {
         </div>
 
         {/* ── ADMIN TOOLS ── */}
-        <div style={{ backgroundColor: C.white, borderRadius: "4px", border: `1px solid ${C.border}`, padding: "24px", marginBottom: "24px" }}>
+        <div className="admin-card" style={{ backgroundColor: C.white, borderRadius: "6px", border: `1px solid ${C.border}`, padding: "24px", marginBottom: "24px", animation: "fadeUp 0.5s ease both" }}>
           <p style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "0.1em", textTransform: "uppercase" as const, color: C.gold, marginBottom: "6px" }}>Admin Tools</p>
           <h3 style={{ fontFamily: FONT_DISPLAY, fontSize: "20px", fontWeight: "400", color: C.black, marginBottom: "20px" }}>Quick Actions</h3>
           <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" as const }}>
@@ -713,7 +729,7 @@ export default function AdminPage() {
 
         {/* ── ITEM SUMMARY ── */}
         {orders.filter(o => ["new","confirmed","ready"].includes(o.status)).length > 0 && (
-          <div style={{ backgroundColor: C.white, borderRadius: "4px", border: `1px solid ${C.border}`, padding: "24px", marginBottom: "24px" }}>
+          <div className="admin-card" style={{ backgroundColor: C.white, borderRadius: "6px", border: `1px solid ${C.border}`, padding: "24px", marginBottom: "24px", animation: "fadeUp 0.5s ease both" }}>
             <p style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "0.1em", textTransform: "uppercase" as const, color: C.gold, marginBottom: "6px" }}>Item Breakdown</p>
             <h3 style={{ fontFamily: FONT_DISPLAY, fontSize: "20px", fontWeight: "400", color: C.black, marginBottom: "20px" }}>What To Prepare</h3>
             {(() => {
@@ -762,7 +778,7 @@ export default function AdminPage() {
         )}
 
         {/* ── QUICK EXPENDITURE ── */}
-        <div style={{ backgroundColor: C.white, borderRadius: "4px", border: `1px solid ${C.border}`, padding: "24px", marginBottom: "24px" }}>
+        <div className="admin-card" style={{ backgroundColor: C.white, borderRadius: "6px", border: `1px solid ${C.border}`, padding: "24px", marginBottom: "24px", animation: "fadeUp 0.5s ease both" }}>
           <p style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "0.1em", textTransform: "uppercase" as const, color: C.gold, marginBottom: "6px" }}>Quick Add</p>
           <h3 style={{ fontFamily: FONT_DISPLAY, fontSize: "20px", fontWeight: "400", color: C.black, marginBottom: "20px" }}>Log an Expense</h3>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "12px" }}>
@@ -789,7 +805,7 @@ export default function AdminPage() {
 
         {/* ── REVENUE HISTORY ── */}
         {revenueHistory.length > 0 && (
-          <div style={{ backgroundColor: C.white, borderRadius: "4px", border: `1px solid ${C.border}`, padding: "24px", marginBottom: "24px" }}>
+          <div className="admin-card" style={{ backgroundColor: C.white, borderRadius: "6px", border: `1px solid ${C.border}`, padding: "24px", marginBottom: "24px", animation: "fadeUp 0.5s ease both" }}>
             <p style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "0.1em", textTransform: "uppercase" as const, color: C.gold, marginBottom: "6px" }}>History</p>
             <h3 style={{ fontFamily: FONT_DISPLAY, fontSize: "20px", fontWeight: "400", color: C.black, marginBottom: "20px" }}>Weekly Revenue</h3>
             <div style={{ display: "grid", gap: "8px" }}>
@@ -825,10 +841,12 @@ export default function AdminPage() {
         <div style={{ display: "flex", gap: "8px", marginBottom: "20px", flexWrap: "wrap" as const }}>
           {(["all","new","confirmed","ready","completed","cancelled"] as const).map(tab => (
             <button key={tab} onClick={() => setFilter(tab)} style={{
-              padding: "8px 16px", borderRadius: "4px", border: "none", cursor: "pointer",
-              fontFamily: FONT_BODY, fontSize: "13px", fontWeight: filter === tab ? "700" : "400",
-              backgroundColor: filter === tab ? C.black : C.white,
-              color: filter === tab ? C.white : C.charcoal, transition: "all 0.15s",
+              padding: "8px 18px", borderRadius: "20px", cursor: "pointer",
+              fontFamily: FONT_BODY, fontSize: "11px", fontWeight: filter === tab ? "700" : "500",
+              letterSpacing: "0.06em",
+              backgroundColor: filter === tab ? C.black : "transparent",
+              color: filter === tab ? C.white : C.muted, transition: "all 0.2s",
+              border: filter === tab ? "none" : `1px solid ${C.border}`,
             }}>
               {tab === "all" ? "All" : STATUS_CONFIG[tab].label} ({counts[tab]})
             </button>
@@ -918,7 +936,7 @@ export default function AdminPage() {
                           </button>
                         )}
                         {cfg.next && (
-                          <button onClick={() => advanceStatus(order.id, order.status)} style={{ backgroundColor: C.gold, color: C.white, padding: "11px 22px", borderRadius: "4px", border: "none", fontFamily: FONT_BODY, fontWeight: "600", fontSize: "13px", cursor: "pointer" }}>
+                          <button onClick={() => advanceStatus(order.id, order.status)} className="gold-btn" style={{ background: `linear-gradient(135deg, ${C.gold}, #E8B84B)`, color: C.black, padding: "11px 22px", borderRadius: "4px", border: "none", fontFamily: FONT_BODY, fontWeight: "700", fontSize: "12px", letterSpacing: "0.08em", cursor: "pointer", textTransform: "uppercase" as const }}>
                             {cfg.nextLabel}
                           </button>
                         )}
@@ -996,5 +1014,6 @@ export default function AdminPage() {
         )}
       </div>
     </main>
+    </>
   );
 }
