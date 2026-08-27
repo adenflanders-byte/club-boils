@@ -833,12 +833,11 @@ export default function AdminPage() {
         <div style={{ display: "flex", gap: "8px", marginBottom: "20px", flexWrap: "wrap" as const }}>
           {(["all","new","confirmed","ready","completed","cancelled"] as const).map(tab => (
             <button key={tab} onClick={() => setFilter(tab)} style={{
-              padding: "8px 18px", borderRadius: "20px", cursor: "pointer",
+              padding: "8px 18px", borderRadius: "20px", border: filter === tab ? "none" : `1px solid ${C.border}`, cursor: "pointer",
               fontFamily: FONT_BODY, fontSize: "11px", fontWeight: filter === tab ? "700" : "500",
               letterSpacing: "0.06em",
               backgroundColor: filter === tab ? C.black : "transparent",
               color: filter === tab ? C.white : C.muted, transition: "all 0.2s",
-              border: filter === tab ? "none" : `1px solid ${C.border}`,
             }}>
               {tab === "all" ? "All" : STATUS_CONFIG[tab].label} ({counts[tab]})
             </button>
