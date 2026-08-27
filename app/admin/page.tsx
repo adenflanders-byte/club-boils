@@ -641,6 +641,53 @@ export default function AdminPage() {
           </div>
         </div>
 
+        {/* ── ITEM SUMMARY ── */}
+        {orders.filter(o => ["new","confirmed","ready"].includes(o.status)).length > 0 && (
+          <div style={{ backgroundColor: C.white, borderRadius: "4px", border: `1px solid ${C.border}`, padding: "24px", marginBottom: "24px" }}>
+            <p style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "0.1em", textTransform: "uppercase" as const, color: C.gold, marginBottom: "6px" }}>Item Breakdown</p>
+            <h3 style={{ fontFamily: FONT_DISPLAY, fontSize: "20px", fontWeight: "400", color: C.black, marginBottom: "20px" }}>What To Prepare</h3>
+            {(() => {
+              // Count all items across active orders
+              const itemCounts: Record<string, number> = {};
+              const activeOrders = orders.filter(o => ["new","confirmed","ready"].includes(o.status));
+              activeOrders.forEach(order => {
+                (order.details || []).forEach((detail: string) => {
+                  // detail format: "1x Club Solo (Shrimp) - TT$130"
+                  const match = detail.match(/^(\d+)x\s(.+?)\s[\(\-]/);
+                  if (match) {
+                    const qty  = parseInt(match[1]);
+                    const name = match[2].trim();
+                    itemCounts[name] = (itemCounts[name] || 0) + qty;
+                  } else {
+                    // fallback - use full detail without price
+                    const clean = detail.replace(/\s*-\s*TT\$[\d]+$/, "").trim();
+                    itemCounts[clean] = (itemCounts[clean] || 0) + 1;
+                  }
+                });
+              });
+
+              const sorted = Object.entries(itemCounts).sort((a, b) => b[1] - a[1]);
+
+              return (
+                <div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "10px", marginBottom: "16px" }}>
+                    {sorted.map(([item, count]) => (
+                      <div key={item} style={{ backgroundColor: C.cream, borderRadius: "4px", border: `1px solid ${C.border}`, padding: "14px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <p style={{ fontSize: "13px", color: C.charcoal, fontWeight: "500", flex: 1, marginRight: "8px" }}>{item}</p>
+                        <span style={{ backgroundColor: C.gold, color: C.white, borderRadius: "20px", padding: "3px 12px", fontSize: "13px", fontWeight: "800", whiteSpace: "nowrap" as const }}>x{count}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ backgroundColor: C.black, borderRadius: "4px", padding: "14px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <p style={{ color: "rgba(255,255,255,0.5)", fontSize: "12px", letterSpacing: "0.08em", textTransform: "uppercase" as const }}>Active Orders</p>
+                    <p style={{ color: C.white, fontFamily: FONT_DISPLAY, fontSize: "20px" }}>{activeOrders.length} orders · TT${activeOrders.reduce((s, o) => s + o.total, 0)}</p>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
         {/* ── REVENUE HISTORY ── */}
         {revenueHistory.length > 0 && (
           <div style={{ backgroundColor: C.white, borderRadius: "4px", border: `1px solid ${C.border}`, padding: "24px", marginBottom: "24px" }}>
