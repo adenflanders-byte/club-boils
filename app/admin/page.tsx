@@ -850,14 +850,39 @@ export default function AdminPage() {
             <p style={{ fontSize: "14px" }}>Loading orders...</p>
           </div>
         ) : filtered.length === 0 ? (
-          <div style={{ textAlign: "center" as const, padding: "60px 24px", color: C.muted }}>
+          <div style={{ textAlign: "center" as const, padding: "60px 24px", color: C.muted, backgroundColor: C.white, borderRadius: "6px", border: `1px solid ${C.border}` }}>
             <p style={{ fontSize: "32px", marginBottom: "12px" }}>📭</p>
             <p style={{ fontFamily: FONT_DISPLAY, fontSize: "20px", color: C.charcoal, marginBottom: "6px" }}>No orders yet</p>
             <p style={{ fontSize: "14px" }}>Orders from customers will appear here automatically.</p>
           </div>
         ) : (
-          <div style={{ display: "grid", gap: "10px" }}>
-            {filtered.map(order => {
+          <div style={{ display: "grid", gap: "32px" }}>
+            {(["new", "confirmed", "ready", "completed", "cancelled"] as const).map(status => {
+              const statusOrders = filtered.filter(o => o.status === status);
+              if (statusOrders.length === 0) return null;
+              const cfg = STATUS_CONFIG[status];
+              return (
+                <div key={status}>
+                  {/* Status header */}
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px", paddingBottom: "12px", borderBottom: `2px solid ${cfg.bg}` }}>
+                    <span style={{ backgroundColor: cfg.bg, color: cfg.color, fontSize: "12px", fontWeight: "800", letterSpacing: "0.1em", padding: "6px 16px", borderRadius: "20px", textTransform: "uppercase" as const }}>{cfg.label}</span>
+                    <span style={{ fontFamily: FONT_DISPLAY, fontSize: "15px", color: C.charcoal }}>{statusOrders.length} order{statusOrders.length !== 1 ? "s" : ""}</span>
+                    {status !== "completed" && status !== "cancelled" && (
+                      <span style={{ fontSize: "13px", color: C.muted }}>· TT${statusOrders.reduce((s, o) => s + o.total, 0)}</span>
+                    )}
+                  </div>
+
+                  {/* Orders grouped by day within this status */}
+                  {(["Thursday", "Friday", "Saturday"] as const).map(day => {
+                    const dayOrders = statusOrders.filter(o => o.notes && o.notes.includes(`Day: ${day}`));
+                    const noDay = statusOrders.filter(o => !o.notes || (!o.notes.includes("Day: Thursday") && !o.notes.includes("Day: Friday") && !o.notes.includes("Day: Saturday")));
+                    const ordersToShow = day === "Thursday" ? [...dayOrders, ...noDay] : dayOrders;
+                    if (ordersToShow.length === 0) return null;
+                    return (
+                      <div key={day} style={{ marginBottom: "16px" }}>
+                        <p style={{ fontSize: "10px", fontWeight: "700", letterSpacing: "0.14em", color: C.muted, textTransform: "uppercase" as const, marginBottom: "8px", paddingLeft: "4px" }}>📅 {day}</p>
+                        <div style={{ display: "grid", gap: "8px" }}>
+                          {ordersToShow.map(order => {
               const cfg = STATUS_CONFIG[order.status];
               const isExpanded = expanded === order.id;
               return (
@@ -998,6 +1023,13 @@ export default function AdminPage() {
                       )}
                     </div>
                   )}
+                </div>
+              );
+            })}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               );
             })}
