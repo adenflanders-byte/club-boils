@@ -727,6 +727,76 @@ export default function AdminPage() {
           </div>
         </div>
 
+        {/* ── PAYMENT SUMMARY ── */}
+        {orders.filter(o => o.status !== "cancelled").length > 0 && (
+          <div className="admin-card" style={{ backgroundColor: C.white, borderRadius: "6px", border: `1px solid ${C.border}`, padding: "24px", marginBottom: "24px", animation: "fadeUp 0.5s ease both" }}>
+            <p style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "0.1em", textTransform: "uppercase" as const, color: C.gold, marginBottom: "6px" }}>Payment Breakdown</p>
+            <h3 style={{ fontFamily: FONT_DISPLAY, fontSize: "20px", fontWeight: "400", color: C.black, marginBottom: "20px" }}>Bank Transfer vs Cash</h3>
+            {(() => {
+              const activeOrders = orders.filter(o => o.status !== "cancelled");
+              const bankOrders = activeOrders.filter(o => o.notes && o.notes.includes("Bank Transfer"));
+              const cashOrders = activeOrders.filter(o => o.notes && o.notes.includes("Cash on Delivery"));
+              const bankTotal  = bankOrders.reduce((s, o) => s + o.total, 0);
+              const cashTotal  = cashOrders.reduce((s, o) => s + o.total, 0);
+              const grandTotal = bankTotal + cashTotal;
+              return (
+                <div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "16px" }}>
+                    {/* Bank Transfer */}
+                    <div style={{ backgroundColor: "#EBF3FF", border: "1px solid #B8D4F5", borderRadius: "6px", padding: "20px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
+                        <span style={{ fontSize: "20px" }}>🏦</span>
+                        <p style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "0.1em", textTransform: "uppercase" as const, color: "#1A56A4" }}>Bank Transfer</p>
+                      </div>
+                      <p style={{ fontFamily: FONT_DISPLAY, fontSize: "28px", color: "#1A56A4", marginBottom: "4px" }}>TT${bankTotal}</p>
+                      <p style={{ fontSize: "12px", color: "#1A56A4", opacity: 0.7 }}>{bankOrders.length} order{bankOrders.length !== 1 ? "s" : ""}</p>
+                      {bankOrders.length > 0 && (
+                        <div style={{ marginTop: "12px", paddingTop: "12px", borderTop: "1px solid rgba(26,86,164,0.2)" }}>
+                          {bankOrders.map(o => (
+                            <div key={o.id} style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", marginBottom: "4px" }}>
+                              <span style={{ color: "#1A56A4" }}>{o.name}</span>
+                              <span style={{ fontWeight: "700", color: "#1A56A4" }}>TT${o.total}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Cash on Delivery */}
+                    <div style={{ backgroundColor: "#EAFFF0", border: "1px solid #8FD4A0", borderRadius: "6px", padding: "20px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
+                        <span style={{ fontSize: "20px" }}>💵</span>
+                        <p style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "0.1em", textTransform: "uppercase" as const, color: "#1A7A3A" }}>Cash on Delivery</p>
+                      </div>
+                      <p style={{ fontFamily: FONT_DISPLAY, fontSize: "28px", color: "#1A7A3A", marginBottom: "4px" }}>TT${cashTotal}</p>
+                      <p style={{ fontSize: "12px", color: "#1A7A3A", opacity: 0.7 }}>{cashOrders.length} order{cashOrders.length !== 1 ? "s" : ""}</p>
+                      {cashOrders.length > 0 && (
+                        <div style={{ marginTop: "12px", paddingTop: "12px", borderTop: "1px solid rgba(26,122,58,0.2)" }}>
+                          {cashOrders.map(o => (
+                            <div key={o.id} style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", marginBottom: "4px" }}>
+                              <span style={{ color: "#1A7A3A" }}>{o.name}</span>
+                              <span style={{ fontWeight: "700", color: "#1A7A3A" }}>TT${o.total}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Grand total */}
+                  <div style={{ backgroundColor: C.black, borderRadius: "6px", padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      <p style={{ fontSize: "10px", fontWeight: "700", letterSpacing: "0.14em", textTransform: "uppercase" as const, color: "rgba(255,255,255,0.4)", marginBottom: "4px" }}>Total Expected</p>
+                      <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.4)" }}>🏦 TT${bankTotal} bank + 💵 TT${cashTotal} cash</p>
+                    </div>
+                    <p style={{ fontFamily: FONT_DISPLAY, fontSize: "28px", color: C.gold }}>TT${grandTotal}</p>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
         {/* ── ITEM SUMMARY ── */}
         {orders.filter(o => ["new","confirmed","ready"].includes(o.status)).length > 0 && (
           <div className="admin-card" style={{ backgroundColor: C.white, borderRadius: "6px", border: `1px solid ${C.border}`, padding: "24px", marginBottom: "24px", animation: "fadeUp 0.5s ease both" }}>
