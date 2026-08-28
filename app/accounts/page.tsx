@@ -32,7 +32,7 @@ export default function AccountsPage() {
   const [loading,      setLoading]      = useState(false);
   const [orderRevenue, setOrderRevenue] = useState<{date: string, amount: number, description: string}[]>([]);
   const [activeTab,    setActiveTab]    = useState<"overview" | "transactions" | "add" | "receipts">("overview");
-  const [viewMode,     setViewMode]     = useState<"weekly" | "monthly">("weekly");
+  const [viewMode,     setViewMode]     = useState<"weekly" | "monthly" | "yearly">("weekly");
   const [filterType,   setFilterType]   = useState<"all" | "income" | "expense">("all");
   const [filterCat,    setFilterCat]    = useState("all");
 
@@ -191,16 +191,20 @@ Return ONLY a JSON object like this, no other text:
     return dateStr.slice(0, 7);
   }
 
+  function getYearKey(dateStr: string) {
+    return dateStr.slice(0, 4);
+  }
+
   function groupTransactions() {
     const groups: Record<string, { transactions: Transaction[], orderRevenue: number }> = {};
+    const getKey = (date: string) => viewMode === "weekly" ? getWeekKey(date) : viewMode === "monthly" ? getMonthKey(date) : getYearKey(date);
     transactions.forEach(t => {
-      const key = viewMode === "weekly" ? getWeekKey(t.date) : getMonthKey(t.date);
+      const key = getKey(t.date);
       if (!groups[key]) groups[key] = { transactions: [], orderRevenue: 0 };
       groups[key].transactions.push(t);
     });
-    // Add order revenue to groups
     orderRevenue.forEach(o => {
-      const key = viewMode === "weekly" ? getWeekKey(o.date) : getMonthKey(o.date);
+      const key = getKey(o.date);
       if (!groups[key]) groups[key] = { transactions: [], orderRevenue: 0 };
       groups[key].orderRevenue += o.amount;
     });
@@ -208,6 +212,7 @@ Return ONLY a JSON object like this, no other text:
   }
 
   function formatPeriod(key: string) {
+    if (viewMode === "yearly") return `Year ${key}`;
     if (viewMode === "monthly") {
       const [year, month] = key.split("-");
       return new Date(Number(year), Number(month) - 1).toLocaleDateString("en-TT", { month: "long", year: "numeric" });
@@ -224,6 +229,23 @@ Return ONLY a JSON object like this, no other text:
   const totalExpenses     = transactions.filter(t => t.type === "expense").reduce((s, t) => s + t.amount, 0);
   const netProfit         = totalIncome - totalExpenses;
   const margin            = totalIncome > 0 ? ((netProfit / totalIncome) * 100).toFixed(1) : "0";
+
+  // Calculate totals for each period
+  const currentYear  = new Date().getFullYear().toString();
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  const currentWeek  = getWeekKey(new Date().toISOString().split("T")[0]);
+
+  const yearlyRevenue  = orderRevenue.filter(o => o.date.startsWith(currentYear)).reduce((s, o) => s + o.amount, 0) + transactions.filter(t => t.type === "income" && t.date.startsWith(currentYear)).reduce((s, t) => s + t.amount, 0);
+  const yearlyExpenses = transactions.filter(t => t.type === "expense" && t.date.startsWith(currentYear)).reduce((s, t) => s + t.amount, 0);
+  const yearlyProfit   = yearlyRevenue - yearlyExpenses;
+
+  const monthlyRevenue  = orderRevenue.filter(o => o.date.startsWith(currentMonth)).reduce((s, o) => s + o.amount, 0) + transactions.filter(t => t.type === "income" && t.date.startsWith(currentMonth)).reduce((s, t) => s + t.amount, 0);
+  const monthlyExpenses = transactions.filter(t => t.type === "expense" && t.date.startsWith(currentMonth)).reduce((s, t) => s + t.amount, 0);
+  const monthlyProfit   = monthlyRevenue - monthlyExpenses;
+
+  const weeklyRevenue  = orderRevenue.filter(o => getWeekKey(o.date) === currentWeek).reduce((s, o) => s + o.amount, 0) + transactions.filter(t => t.type === "income" && getWeekKey(t.date) === currentWeek).reduce((s, t) => s + t.amount, 0);
+  const weeklyExpenses = transactions.filter(t => t.type === "expense" && getWeekKey(t.date) === currentWeek).reduce((s, t) => s + t.amount, 0);
+  const weeklyProfit   = weeklyRevenue - weeklyExpenses;
 
   const expenseByCategory = EXPENSE_CATEGORIES.map(cat => ({
     cat,
@@ -317,6 +339,34 @@ Return ONLY a JSON object like this, no other text:
             <div style={{ display: "flex", gap: "8px", marginBottom: "24px" }}>
               <button style={tabBtn(viewMode === "weekly")}  onClick={() => setViewMode("weekly")}>Weekly</button>
               <button style={tabBtn(viewMode === "monthly")} onClick={() => setViewMode("monthly")}>Monthly</button>
+              <button style={tabBtn(viewMode === "yearly")}  onClick={() => setViewMode("yearly")}>Yearly</button>
+            </div>
+
+            {/* Period Summary — Weekly / Monthly / Yearly */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px", marginBottom: "24px" }}>
+              {[
+                { period: "This Week",  revenue: weeklyRevenue,  expenses: weeklyExpenses,  profit: weeklyProfit  },
+                { period: "This Month", revenue: monthlyRevenue, expenses: monthlyExpenses, profit: monthlyProfit },
+                { period: "This Year",  revenue: yearlyRevenue,  expenses: yearlyExpenses,  profit: yearlyProfit  },
+              ].map(p => (
+                <div key={p.period} className="acct-card" style={{ backgroundColor: C.white, borderRadius: "6px", border: `1px solid ${C.border}`, padding: "20px", animation: "fadeUp 0.5s ease both" }}>
+                  <p style={{ fontSize: "10px", fontWeight: "700", letterSpacing: "0.14em", textTransform: "uppercase" as const, color: C.gold, marginBottom: "14px" }}>{p.period}</p>
+                  <div style={{ display: "grid", gap: "8px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px" }}>
+                      <span style={{ color: C.muted }}>Revenue</span>
+                      <span style={{ fontWeight: "700", color: C.gold }}>TT${p.revenue}</span>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px" }}>
+                      <span style={{ color: C.muted }}>Expenses</span>
+                      <span style={{ fontWeight: "700", color: "#A03030" }}>TT${p.expenses}</span>
+                    </div>
+                    <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: "8px", display: "flex", justifyContent: "space-between" }}>
+                      <span style={{ fontSize: "11px", fontWeight: "700", color: C.muted }}>Net Profit</span>
+                      <span style={{ fontFamily: FD, fontSize: "16px", fontWeight: "700", color: p.profit >= 0 ? "#1A7A3A" : "#A03030" }}>{p.profit >= 0 ? "+" : ""}TT${p.profit}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
 
             {/* Summary cards */}
