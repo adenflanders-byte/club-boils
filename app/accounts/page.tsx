@@ -51,6 +51,14 @@ export default function AccountsPage() {
   const [scanResult,     setScanResult]     = useState<{items: {description: string, amount: number, category: string}[], total: number} | null>(null);
   const [scanError,      setScanError]      = useState("");
 
+  // Editing
+  const [editingId,    setEditingId]    = useState<string | null>(null);
+  const [editCategory, setEditCategory] = useState("");
+  const [editDesc,     setEditDesc]     = useState("");
+  const [editAmount,   setEditAmount]   = useState("");
+  const [editDate,     setEditDate]     = useState("");
+  const [editType,     setEditType]     = useState<"income" | "expense">("expense");
+
   async function scanReceipt(file: File) {
     setScanError("");
     setScanResult(null);
@@ -170,6 +178,30 @@ Return ONLY a JSON object like this, no other text:
     setNewCategory(""); setNewDescription(""); setNewAmount(""); setNewDate(new Date().toISOString().split("T")[0]);
     setTimeout(() => setSaved(false), 3000);
     fetchTransactions();
+  }
+
+  function startEdit(t: Transaction) {
+    setEditingId(t.id);
+    setEditCategory(t.category);
+    setEditDesc(t.description || "");
+    setEditAmount(String(t.amount));
+    setEditDate(t.date);
+    setEditType(t.type);
+  }
+
+  async function saveEdit() {
+    if (!editingId) return;
+    await supabase.from("accounts").update({
+      category:    editCategory,
+      description: editDesc.trim() || null,
+      amount:      Math.round(Number(editAmount)),
+      date:        editDate,
+      type:        editType,
+    }).eq("id", editingId);
+    setTransactions(prev => prev.map(t => t.id === editingId ? {
+      ...t, category: editCategory, description: editDesc, amount: Math.round(Number(editAmount)), date: editDate, type: editType
+    } : t));
+    setEditingId(null);
   }
 
   async function deleteTransaction(id: string) {
