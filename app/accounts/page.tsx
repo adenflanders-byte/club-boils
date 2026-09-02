@@ -332,17 +332,19 @@ export default function AccountsPage() {
     lastmonth: "Last Month", year: "This Year", all: "All Time",
   };
 
-  // Grouped breakdown for weekly/monthly view
+  // Grouped breakdown - respects period filter
   function getBreakdownGroups() {
     const groups: Record<string, { earnedRevenue: number; expenses: number; orders: number }> = {};
-    completedOrders.forEach(o => {
-      const fd = getFulfilmentDate(o) || o.created_at.split("T")[0];
-      const key = getWeekKey(fd);
-      if (!groups[key]) groups[key] = { earnedRevenue: 0, expenses: 0, orders: 0 };
-      groups[key].earnedRevenue += o.total;
-      groups[key].orders++;
-    });
-    transactions.filter(t => t.type === "expense").forEach(t => {
+    completedOrders
+      .filter(o => { const fd = getFulfilmentDate(o) || o.created_at.split("T")[0]; return inPeriod(fd); })
+      .forEach(o => {
+        const fd  = getFulfilmentDate(o) || o.created_at.split("T")[0];
+        const key = getWeekKey(fd);
+        if (!groups[key]) groups[key] = { earnedRevenue: 0, expenses: 0, orders: 0 };
+        groups[key].earnedRevenue += o.total;
+        groups[key].orders++;
+      });
+    periodTx.filter(t => t.type === "expense").forEach(t => {
       const key = getWeekKey(t.date);
       if (!groups[key]) groups[key] = { earnedRevenue: 0, expenses: 0, orders: 0 };
       groups[key].expenses += t.amount;
@@ -524,7 +526,7 @@ export default function AccountsPage() {
                       return (
                         <div style={{ padding: "14px 16px", backgroundColor: C.black, borderRadius: "4px", marginTop: "12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                           <div>
-                            <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.4)", letterSpacing: "0.1em", textTransform: "uppercase" as const, marginBottom: "4px" }}>All Time Total ({groups.length} weeks)</p>
+                            <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.4)", letterSpacing: "0.1em", textTransform: "uppercase" as const, marginBottom: "4px" }}>Total — {periodLabels[periodFilter]} ({groups.length} week{groups.length !== 1 ? "s" : ""})</p>
                             <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)" }}>Revenue: TT${totalRev} · Expenses: TT${totalExp}</p>
                           </div>
                           <p style={{ fontFamily: FD, fontSize: "22px", color: totalNet >= 0 ? "#8FD4A0" : "#F5C6C6" }}>{totalNet >= 0 ? "+" : ""}TT${totalNet}</p>
