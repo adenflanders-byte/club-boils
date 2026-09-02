@@ -13,30 +13,30 @@ interface CartItem {
 }
 
 const SEAFOOD = [
-  { id: "shrimp",  emoji: "🦐", label: "Shrimp",         desc: "10–12 shrimp",        price: 30 },
-  { id: "crab",    emoji: "🦀", label: "Snow Crab",       desc: "Crab legs (portion)", price: 50 },
-  { id: "mussels", emoji: "🐚", label: "Mussels",         desc: "Portion",             price: 10 },
-  { id: "squid",   emoji: "🐙", label: "Squid & Octopus", desc: "Portion",             price: 20 },
-  { id: "clams",   emoji: "🐌", label: "Clams",           desc: "Portion",             price: 10 },
+  { id: "shrimp",  emoji: "🦐", label: "Shrimp",         desc: "6 shrimp",            price: 30 },
+  { id: "crab",    emoji: "🦀", label: "Snow Crab",       desc: "1 portion",           price: 50 },
+  { id: "mussels", emoji: "🐚", label: "Mussels",         desc: "1 portion",           price: 10 },
+  { id: "squid",   emoji: "🐙", label: "Squid & Octopus", desc: "1 portion",           price: 20 },
+  { id: "clams",   emoji: "🐌", label: "Clams",           desc: "1 portion",           price: 10 },
 ];
 const DUO_SEAFOOD = [
   { id: "shrimp",  emoji: "🦐", label: "Shrimp",         desc: "12 shrimp",           price: 60  },
   { id: "crab",    emoji: "🦀", label: "Snow Crab",       desc: "2 portions",          price: 100 },
-  { id: "mussels", emoji: "🐚", label: "Mussels",         desc: "Portion",             price: 20  },
-  { id: "squid",   emoji: "🐙", label: "Squid & Octopus", desc: "Portion",             price: 40  },
-  { id: "clams",   emoji: "🐌", label: "Clams",           desc: "Portion",             price: 20  },
+  { id: "mussels", emoji: "🐚", label: "Mussels",         desc: "2 portions",          price: 20  },
+  { id: "squid",   emoji: "🐙", label: "Squid & Octopus", desc: "2 portions",          price: 40  },
+  { id: "clams",   emoji: "🐌", label: "Clams",           desc: "2 portions",          price: 20  },
 ];
 const EXTRAS = [
-  { id: "eggs",     emoji: "🥚", label: "Eggs",           desc: "2 pieces", price: 5  },
-  { id: "sausage",  emoji: "🌭", label: "Sausage",        desc: "Portion",  price: 10 },
-  { id: "corn",     emoji: "🌽", label: "Extra Corn",     desc: "Portion",  price: 5  },
-  { id: "potatoes", emoji: "🥔", label: "Extra Potatoes", desc: "Portion",  price: 5  },
+  { id: "eggs",     emoji: "🥚", label: "Eggs",           desc: "2 pieces",  price: 5  },
+  { id: "sausage",  emoji: "🌭", label: "Sausage",        desc: "1 portion", price: 10 },
+  { id: "corn",     emoji: "🌽", label: "Extra Corn",     desc: "1 portion", price: 5  },
+  { id: "potatoes", emoji: "🥔", label: "Extra Potatoes", desc: "1 portion", price: 5  },
 ];
 const DUO_EXTRAS = [
-  { id: "eggs",     emoji: "🥚", label: "Eggs",           desc: "2 pieces", price: 10 },
-  { id: "sausage",  emoji: "🌭", label: "Sausage",        desc: "Portion",  price: 20 },
-  { id: "corn",     emoji: "🌽", label: "Extra Corn",     desc: "Portion",  price: 10 },
-  { id: "potatoes", emoji: "🥔", label: "Extra Potatoes", desc: "Portion",  price: 10 },
+  { id: "eggs",     emoji: "🥚", label: "Eggs",           desc: "4 pieces",  price: 10 },
+  { id: "sausage",  emoji: "🌭", label: "Sausage",        desc: "2 portions",price: 20 },
+  { id: "corn",     emoji: "🌽", label: "Extra Corn",     desc: "2 portions",price: 10 },
+  { id: "potatoes", emoji: "🥔", label: "Extra Potatoes", desc: "2 portions",price: 10 },
 ];
 const HEATS = [
   { id: "mild",   label: "Mild",   emoji: "😊" },
@@ -56,7 +56,7 @@ const DUO_OPTIONS = [
 const SIMPLE_ITEMS = [
   { id: "ramen", name: "Shrimp Alfredo Ramen Boil", desc: "Shrimp, ramen noodles, homemade Alfredo sauce, sausage, boiled egg & corn", price: 100, image: "/ramen2.jpeg", tag: "Fan Favourite" },
   { id: "wings", name: "Wings Boil", desc: "6-8 wings tossed in our signature specialty butter sauce", price: 80, image: "/wings2.jpeg", tag: null },
-  { id: "sauce", name: "House Sauce", desc: "Homemade Lime Pepper Sauce", price: 10, image: null, tag: null },
+  { id: "sauce", name: "Pepper Sauce", desc: "Homemade Lime Pepper Sauce — optional add-on", price: 10, image: null, tag: null },
   { id: "combo", name: "Club Ramen Wings Combo", desc: "Shrimp Alfredo Ramen Boil + Wings Boil — the ultimate combo", price: 120, image: "/wings2.jpeg", tag: "New" },
 ];
 
@@ -461,7 +461,10 @@ export default function Home() {
               <div style={{ display: "flex", gap: "32px", alignItems: "center", flexWrap: "wrap" as const, justifyContent: "center" }}>
                 <a href="https://instagram.com/theclub.boils" target="_blank" rel="noopener noreferrer" style={{ color: gold, textDecoration: "none", fontSize: "13px", fontWeight: "600", letterSpacing: "0.06em" }}>📸 @theclub.boils</a>
                 <span style={{ color: "rgba(255,255,255,0.15)" }}>·</span>
-                <a href="tel:8682930570" style={{ color: gold, textDecoration: "none", fontSize: "13px", fontWeight: "600", letterSpacing: "0.06em" }}>📞 868-293-0570</a>
+                <a href="https://wa.me/18682930570?text=Hi%2C%20I%27d%20like%20some%20information%20about%20ordering%20from%20The%20Club%20Boils." target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: "8px", backgroundColor: "#25D366", color: white, padding: "10px 20px", borderRadius: "4px", textDecoration: "none", fontFamily: "'Inter', sans-serif", fontSize: "13px", fontWeight: "600", letterSpacing: "0.04em", marginBottom: "10px" }}>
+                WhatsApp Us
+              </a>
+              <a href="tel:8682930570" style={{ color: gold, textDecoration: "none", fontSize: "13px", fontWeight: "600", letterSpacing: "0.06em" }}>📞 868-293-0570</a>
               </div>
               <p style={{ color: "rgba(255,255,255,0.2)", fontSize: "10px", letterSpacing: "0.16em", textTransform: "uppercase" as const }}>Stay Connected · Arima, Trinidad</p>
             </div>
@@ -564,7 +567,7 @@ export default function Home() {
               SEAFOOD
             </h1>
             <p style={{ fontSize: "clamp(13px, 2vw, 16px)", color: "rgba(255,255,255,0.65)", maxWidth: "440px", margin: "0 auto 48px", lineHeight: 1.9, fontWeight: "300", letterSpacing: "0.02em" }}>
-              Pre-order every week. Pickup every Saturday in Arima.<br />Orders close Friday at 8PM.
+              Open Thursday, Friday &amp; Saturday. Order online for pickup or delivery.
             </p>
             <button onClick={revealMenu} style={goldBtn} className="gold-btn">
               Browse the Menu
@@ -652,7 +655,7 @@ export default function Home() {
               </div>
             ) : (
               <div style={{ marginBottom: "48px", padding: "24px", border: `1px solid ${border}`, borderRadius: "4px", display: "inline-block" }}>
-                <p style={{ color: "rgba(255,255,255,0.4)", fontSize: "14px" }}>Check back soon — we open weekly!</p>
+                <p style={{ color: "rgba(255,255,255,0.4)", fontSize: "14px" }}>Check back soon — we open Thursday, Friday & Saturday!</p>
               </div>
             )}
             <button onClick={revealMenu} style={goldBtn} className="gold-btn">
@@ -868,7 +871,7 @@ export default function Home() {
                         <p style={{ fontFamily: "'Inter', sans-serif", fontSize: "10px", fontWeight: "700", letterSpacing: "0.14em", textTransform: "uppercase" as const, color: gold, marginBottom: "12px" }}>Step 1 — Base (x2, included)</p>
                         <div style={{ padding: "16px", border: `1px solid ${border}`, borderRadius: "2px", backgroundColor: goldDim }}>
                           <p style={{ fontFamily: "'Cinzel', serif", fontSize: "16px", color: black }}>Duo Base Tray — TT$100</p>
-                          <p style={{ fontSize: "12px", color: muted, marginTop: "4px" }}>Includes double potatoes, double corn & double house sauce</p>
+                          <p style={{ fontSize: "12px", color: muted, marginTop: "4px" }}>Includes double potatoes, double corn & Specialty Butter Sauce</p>
                         </div>
                       </div>
                       <div>
@@ -975,7 +978,7 @@ export default function Home() {
                 </div>
                 {fulfillment === "delivery" && (
                   <div style={{ backgroundColor: "rgba(196,149,42,0.08)", border: `1px solid ${border}`, borderRadius: "2px", padding: "14px 16px", fontSize: "13px", color: muted, lineHeight: 1.6 }}>
-                    ⚠️ Delivery is currently limited to certain areas in the East. Confirmation would be sent upon contact.
+                    ⚠️ Delivery is available to select areas in East Trinidad for TT$30. We'll confirm availability for your address after your order is placed.
                   </div>
                 )}
                 {fulfillment === "delivery" && (
@@ -1072,7 +1075,7 @@ export default function Home() {
 
                 {paymentMethod === "cash" && (
                   <div style={{ backgroundColor: "rgba(196,149,42,0.08)", border: `1px solid ${border}`, borderRadius: "4px", padding: "14px 16px", fontSize: "12px", color: muted, lineHeight: 1.7 }}>
-                    Payment will be collected upon delivery or pickup. Please have the exact amount ready.
+                    Payment will be collected upon delivery or pickup. Please have the exact amount ready. A TT$30 delivery fee applies to all deliveries.
                   </div>
                 )}
 
@@ -1099,7 +1102,7 @@ export default function Home() {
             <div style={{ margin: "20px auto", maxWidth: "440px", textAlign: "left" as const }}>
               {cart.map((item, idx) => <p key={idx} style={{ fontSize: "13px", color: muted, marginBottom: "6px", padding: "8px 0", borderBottom: `1px solid ${border}` }}>· {item.quantity}x {item.name} — {item.description}</p>)}
             </div>
-            <p style={{ color: muted, fontSize: "13px", marginTop: "16px" }}>{fulfillment === "delivery" ? `🚗 Delivering to: ${address}` : "🏠 Pickup — Arima"}</p>
+            <p style={{ color: muted, fontSize: "13px", marginTop: "16px" }}>{fulfillment === "delivery" ? `🚗 Delivering to: ${address}` : "🏠 Pickup — Arima (Thu, Fri & Sat)"}</p>
             {orderDay && <p style={{ color: gold, fontSize: "15px", fontWeight: "700", marginTop: "8px" }}>📅 Your order is for {orderDay.charAt(0).toUpperCase() + orderDay.slice(1)}</p>}
             <p style={{ fontFamily: "'Cinzel', serif", fontSize: "28px", color: gold, margin: "20px 0 8px" }}>TT${totalPrice}</p>
             <p style={{ color: muted, fontSize: "12px", letterSpacing: "0.04em" }}>We will confirm via text to <strong>{phone}</strong> before Friday 8PM.</p>
@@ -1189,7 +1192,7 @@ export default function Home() {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "1px", backgroundColor: border }}>
               {[
                 { icon: "📍", label: "Location", value: "Arima, Trinidad", sub: "Exact address shared upon confirmation" },
-                { icon: "🕛", label: "Hours",    value: "Saturday Only", sub: "12:00 PM – 6:00 PM" },
+                { icon: "🕛", label: "Hours",    value: "Thu, Fri &amp; Sat", sub: "12:00 PM – 6:00 PM" },
                 { icon: "📞", label: "Phone",    value: "868-293-0570", sub: "Call or WhatsApp", href: "tel:8682930570" },
                 { icon: "📸", label: "Instagram", value: "@theclub.boils", sub: "Follow for updates", href: "https://instagram.com/theclub.boils" },
               ].map(item => (
@@ -1225,11 +1228,14 @@ export default function Home() {
           </div>
           <div style={{ display: "flex", gap: "24px", flexWrap: "wrap" as const }}>
             <a href="https://instagram.com/theclub.boils" target="_blank" rel="noopener noreferrer" style={{ color: muted, textDecoration: "none", fontSize: "11px", letterSpacing: "0.08em", transition: "color 0.2s" }} onMouseEnter={e => (e.currentTarget.style.color = gold)} onMouseLeave={e => (e.currentTarget.style.color = muted)}>@theclub.boils</a>
-            <a href="tel:8682930570" style={{ color: muted, textDecoration: "none", fontSize: "11px", letterSpacing: "0.08em", transition: "color 0.2s" }} onMouseEnter={e => (e.currentTarget.style.color = gold)} onMouseLeave={e => (e.currentTarget.style.color = muted)}>868-293-0570</a>
+            <a href="https://wa.me/18682930570?text=Hi%2C%20I%27d%20like%20some%20information%20about%20ordering%20from%20The%20Club%20Boils." target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: "8px", backgroundColor: "#25D366", color: white, padding: "10px 20px", borderRadius: "4px", textDecoration: "none", fontFamily: "'Inter', sans-serif", fontSize: "13px", fontWeight: "600", letterSpacing: "0.04em", marginBottom: "10px" }}>
+                WhatsApp Us
+              </a>
+              <a href="tel:8682930570" style={{ color: muted, textDecoration: "none", fontSize: "11px", letterSpacing: "0.08em", transition: "color 0.2s" }} onMouseEnter={e => (e.currentTarget.style.color = gold)} onMouseLeave={e => (e.currentTarget.style.color = muted)}>868-293-0570</a>
             <span style={{ color: muted, fontSize: "11px", letterSpacing: "0.08em" }}>Arima, Trinidad</span>
           </div>
           <p style={{ color: "rgba(255,255,255,0.15)", fontSize: "10px", letterSpacing: "0.06em" }}>© {new Date().getFullYear()} The Club Boils</p>
-          <a href="/admin" style={{ color: "rgba(255,255,255,0.1)", fontSize: "10px", textDecoration: "none", letterSpacing: "0.06em" }} onMouseEnter={e => (e.currentTarget.style.color = gold)} onMouseLeave={e => (e.currentTarget.style.color = "rgba(255,255,255,0.1)")}>Admin</a>
+
         </footer>
 
       </main>
