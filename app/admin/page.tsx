@@ -419,7 +419,24 @@ export default function AdminPage() {
     cancelled: orders.filter(o => o.status === "cancelled").length,
   };
 
-  const totalRevenue  = orders.filter(o => o.status === "completed").reduce((s, o) => s + o.total, 0);
+  // Revenue helpers - only completed orders
+  function getFulfilmentDate(order: Order): string | null {
+    if (!order.notes) return null;
+    const m = order.notes.match(/Day:\s*(Thursday|Friday|Saturday)/i);
+    if (!m) return null;
+    const base = new Date(order.created_at);
+    const dayMap: Record<string, number> = { thursday: 4, friday: 5, saturday: 6 };
+    const target = dayMap[m[1].toLowerCase()];
+    const cur = base.getDay();
+    let diff = target - cur;
+    if (diff <= 0) diff += 7;
+    const result = new Date(base);
+    result.setDate(base.getDate() + diff);
+    return result.toISOString().split("T")[0];
+  }
+
+  const completedOrders = orders.filter(o => o.status === "completed");
+  const totalRevenue    = completedOrders.reduce((s, o) => s + o.total, 0);
   const pendingCount  = orders.filter(o => ["new","confirmed","ready"].includes(o.status)).length;
 
   const inputStyle: React.CSSProperties = {
@@ -852,26 +869,24 @@ export default function AdminPage() {
           <p style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "0.1em", textTransform: "uppercase" as const, color: C.gold, marginBottom: "6px" }}>Revenue</p>
           <h3 style={{ fontFamily: FONT_DISPLAY, fontSize: "20px", fontWeight: "400", color: C.black, marginBottom: "20px" }}>Completed Orders Only</h3>
           {(() => {
-            const completed = orders.filter(o => o.status === "completed");
-
             const now = new Date();
 
-            // Weekly
+            // Weekly - use fulfilment date
             const weekStart = new Date(now);
             weekStart.setDate(now.getDate() - now.getDay() + (now.getDay() === 0 ? -6 : 1));
             weekStart.setHours(0,0,0,0);
-            const weekRevenue = completed.filter(o => new Date(o.created_at) >= weekStart).reduce((s, o) => s + o.total, 0);
-            const weekCount   = completed.filter(o => new Date(o.created_at) >= weekStart).length;
+            const weekRevenue = completedOrders.filter(o => { const fd = getFulfilmentDate(o) || o.created_at.split("T")[0]; return new Date(fd) >= weekStart; }).reduce((s, o) => s + o.total, 0);
+            const weekCount   = completedOrders.filter(o => { const fd = getFulfilmentDate(o) || o.created_at.split("T")[0]; return new Date(fd) >= weekStart; }).length;
 
             // Monthly
             const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-            const monthRevenue = completed.filter(o => new Date(o.created_at) >= monthStart).reduce((s, o) => s + o.total, 0);
-            const monthCount   = completed.filter(o => new Date(o.created_at) >= monthStart).length;
+            const monthRevenue = completedOrders.filter(o => { const fd = getFulfilmentDate(o) || o.created_at.split("T")[0]; return new Date(fd) >= monthStart; }).reduce((s, o) => s + o.total, 0);
+            const monthCount   = completedOrders.filter(o => { const fd = getFulfilmentDate(o) || o.created_at.split("T")[0]; return new Date(fd) >= monthStart; }).length;
 
             // Yearly
             const yearStart = new Date(now.getFullYear(), 0, 1);
-            const yearRevenue = completed.filter(o => new Date(o.created_at) >= yearStart).reduce((s, o) => s + o.total, 0);
-            const yearCount   = completed.filter(o => new Date(o.created_at) >= yearStart).length;
+            const yearRevenue = completedOrders.filter(o => { const fd = getFulfilmentDate(o) || o.created_at.split("T")[0]; return new Date(fd) >= yearStart; }).reduce((s, o) => s + o.total, 0);
+            const yearCount   = completedOrders.filter(o => { const fd = getFulfilmentDate(o) || o.created_at.split("T")[0]; return new Date(fd) >= yearStart; }).length;
 
             return (
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: "12px" }}>
@@ -879,7 +894,7 @@ export default function AdminPage() {
                   { label: "This Week",  revenue: weekRevenue,  count: weekCount,  icon: "📅" },
                   { label: "This Month", revenue: monthRevenue, count: monthCount, icon: "📆" },
                   { label: "This Year",  revenue: yearRevenue,  count: yearCount,  icon: "🗓️" },
-                  { label: "All Time",   revenue: totalRevenue, count: completed.length, icon: "💰" },
+                  { label: "All Time",   revenue: totalRevenue, count: completedOrders.length, icon: "💰" },
                 ].map(p => (
                   <div key={p.label} style={{ backgroundColor: C.cream, borderRadius: "6px", border: `1px solid ${C.border}`, padding: "16px" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "10px" }}>
