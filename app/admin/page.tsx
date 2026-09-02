@@ -135,8 +135,8 @@ export default function AdminPage() {
   function exportToPDF() {
     const printWindow = window.open("", "_blank");
     if (!printWindow) return;
-    const activeOrders = orders.filter(o => ["new","confirmed","ready"].includes(o.status));
-    const revenue = activeOrders.reduce((s, o) => s + o.total, 0);
+    const prepOrders = orders.filter(o => ["new","confirmed","ready"].includes(o.status));
+    const revenue = prepOrders.reduce((s, o) => s + o.total, 0);
     const html = `
       <!DOCTYPE html>
       <html>
@@ -167,14 +167,14 @@ export default function AdminPage() {
         <p class="subtitle">Saturday Order List &nbsp;·&nbsp; ${new Date().toLocaleDateString("en-TT", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</p>
         <hr class="divider" />
         <div class="summary-bar">
-          <div class="summary-item"><strong>${activeOrders.length}</strong> Total Orders</div>
-          <div class="summary-item"><strong>${activeOrders.filter(o => o.fulfillment === "delivery").length}</strong> Deliveries</div>
-          <div class="summary-item"><strong>${activeOrders.filter(o => o.fulfillment === "pickup").length}</strong> Pickups</div>
+          <div class="summary-item"><strong>${prepOrders.length}</strong> Total Orders</div>
+          <div class="summary-item"><strong>${prepOrders.filter(o => o.fulfillment === "delivery").length}</strong> Deliveries</div>
+          <div class="summary-item"><strong>${prepOrders.filter(o => o.fulfillment === "pickup").length}</strong> Pickups</div>
           <div class="summary-item"><strong>TT$${revenue}</strong> Total Revenue</div>
         </div>
         <hr class="divider" />
-        <p class="section-title">Orders (${activeOrders.length})</p>
-        ${activeOrders.map((o, i) => `
+        <p class="section-title">Orders (${prepOrders.length})</p>
+        ${prepOrders.map((o: Order, i: number) => `
           <div class="order">
             <div class="order-header">
               <div>
@@ -184,7 +184,7 @@ export default function AdminPage() {
               <div class="order-total">TT$${o.total}</div>
             </div>
             <div class="detail"><strong>Package:</strong> ${o.package}</div>
-            ${(o.details || []).map(d => `<div class="detail">&nbsp;&nbsp;· ${d}</div>`).join("")}
+            ${(o.details || []).map((d: string) => `<div class="detail">&nbsp;&nbsp;· ${d}</div>`).join("")}
             <div style="margin-top:8px;">
               ${o.fulfillment === "delivery"
                 ? `<span class="delivery-tag">🚗 Delivery</span> <span class="detail" style="display:inline">${o.address}</span>`
@@ -208,7 +208,7 @@ export default function AdminPage() {
   function exportFinancialsPDF() {
     const printWindow = window.open("", "_blank");
     if (!printWindow) return;
-    const activeOrders = orders.filter(o => o.status !== "cancelled");
+    const activeOrders = orders.filter(o => o.status === "completed");
     const revenue  = activeOrders.reduce((s, o) => s + o.total, 0);
     const exp      = Number(weeklyExpenditure) || 0;
     const profit   = revenue - exp;
@@ -419,7 +419,7 @@ export default function AdminPage() {
     cancelled: orders.filter(o => o.status === "cancelled").length,
   };
 
-  const totalRevenue  = orders.filter(o => o.status !== "cancelled").reduce((s, o) => s + o.total, 0);
+  const totalRevenue  = orders.filter(o => o.status === "completed").reduce((s, o) => s + o.total, 0);
   const pendingCount  = orders.filter(o => ["new","confirmed","ready"].includes(o.status)).length;
 
   const inputStyle: React.CSSProperties = {
@@ -733,7 +733,7 @@ export default function AdminPage() {
             <p style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "0.1em", textTransform: "uppercase" as const, color: C.gold, marginBottom: "6px" }}>Payment Breakdown</p>
             <h3 style={{ fontFamily: FONT_DISPLAY, fontSize: "20px", fontWeight: "400", color: C.black, marginBottom: "20px" }}>Bank Transfer vs Cash</h3>
             {(() => {
-              const activeOrders = orders.filter(o => o.status !== "cancelled");
+              const activeOrders = orders.filter(o => o.status === "completed");
               const bankOrders = activeOrders.filter(o => o.notes && o.notes.includes("Bank Transfer"));
               const cashOrders = activeOrders.filter(o => o.notes && o.notes.includes("Cash on Delivery"));
               const bankTotal  = bankOrders.reduce((s, o) => s + o.total, 0);
@@ -805,8 +805,8 @@ export default function AdminPage() {
             {(() => {
               // Count all items across active orders
               const itemCounts: Record<string, number> = {};
-              const activeOrders = orders.filter(o => ["new","confirmed","ready"].includes(o.status));
-              activeOrders.forEach(order => {
+              const prepOrders = orders.filter(o => ["new","confirmed","ready"].includes(o.status));
+              prepOrders.forEach(order => {
                 (order.details || []).forEach((detail: string) => {
                   // detail format: "1x Club Solo (Shrimp) - TT$130"
                   // Try: quantity + name + (variant)
@@ -839,13 +839,61 @@ export default function AdminPage() {
                   </div>
                   <div style={{ backgroundColor: C.black, borderRadius: "4px", padding: "14px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <p style={{ color: "rgba(255,255,255,0.5)", fontSize: "12px", letterSpacing: "0.08em", textTransform: "uppercase" as const }}>Active Orders</p>
-                    <p style={{ color: C.white, fontFamily: FONT_DISPLAY, fontSize: "20px" }}>{activeOrders.length} orders · TT${activeOrders.reduce((s, o) => s + o.total, 0)}</p>
+                    <p style={{ color: C.white, fontFamily: FONT_DISPLAY, fontSize: "20px" }}>{prepOrders.length} orders · TT${prepOrders.reduce((s: number, o: Order) => s + o.total, 0)}</p>
                   </div>
                 </div>
               );
             })()}
           </div>
         )}
+
+        {/* ── REVENUE BREAKDOWN ── */}
+        <div className="admin-card" style={{ backgroundColor: C.white, borderRadius: "6px", border: `1px solid ${C.border}`, padding: "24px", marginBottom: "24px" }}>
+          <p style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "0.1em", textTransform: "uppercase" as const, color: C.gold, marginBottom: "6px" }}>Revenue</p>
+          <h3 style={{ fontFamily: FONT_DISPLAY, fontSize: "20px", fontWeight: "400", color: C.black, marginBottom: "20px" }}>Completed Orders Only</h3>
+          {(() => {
+            const completed = orders.filter(o => o.status === "completed");
+
+            const now = new Date();
+
+            // Weekly
+            const weekStart = new Date(now);
+            weekStart.setDate(now.getDate() - now.getDay() + (now.getDay() === 0 ? -6 : 1));
+            weekStart.setHours(0,0,0,0);
+            const weekRevenue = completed.filter(o => new Date(o.created_at) >= weekStart).reduce((s, o) => s + o.total, 0);
+            const weekCount   = completed.filter(o => new Date(o.created_at) >= weekStart).length;
+
+            // Monthly
+            const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+            const monthRevenue = completed.filter(o => new Date(o.created_at) >= monthStart).reduce((s, o) => s + o.total, 0);
+            const monthCount   = completed.filter(o => new Date(o.created_at) >= monthStart).length;
+
+            // Yearly
+            const yearStart = new Date(now.getFullYear(), 0, 1);
+            const yearRevenue = completed.filter(o => new Date(o.created_at) >= yearStart).reduce((s, o) => s + o.total, 0);
+            const yearCount   = completed.filter(o => new Date(o.created_at) >= yearStart).length;
+
+            return (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: "12px" }}>
+                {[
+                  { label: "This Week",  revenue: weekRevenue,  count: weekCount,  icon: "📅" },
+                  { label: "This Month", revenue: monthRevenue, count: monthCount, icon: "📆" },
+                  { label: "This Year",  revenue: yearRevenue,  count: yearCount,  icon: "🗓️" },
+                  { label: "All Time",   revenue: totalRevenue, count: completed.length, icon: "💰" },
+                ].map(p => (
+                  <div key={p.label} style={{ backgroundColor: C.cream, borderRadius: "6px", border: `1px solid ${C.border}`, padding: "16px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "10px" }}>
+                      <p style={{ fontSize: "10px", fontWeight: "700", letterSpacing: "0.12em", textTransform: "uppercase" as const, color: C.muted }}>{p.label}</p>
+                      <span style={{ fontSize: "18px" }}>{p.icon}</span>
+                    </div>
+                    <p style={{ fontFamily: FONT_DISPLAY, fontSize: "22px", color: C.gold, marginBottom: "4px" }}>TT${p.revenue}</p>
+                    <p style={{ fontSize: "11px", color: C.muted }}>{p.count} completed order{p.count !== 1 ? "s" : ""}</p>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+        </div>
 
         {/* ── QUICK EXPENDITURE ── */}
         <div className="admin-card" style={{ backgroundColor: C.white, borderRadius: "6px", border: `1px solid ${C.border}`, padding: "24px", marginBottom: "24px", animation: "fadeUp 0.5s ease both" }}>
