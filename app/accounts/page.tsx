@@ -367,38 +367,79 @@ Return ONLY a JSON object like this, no other text:
         {/* ── OVERVIEW TAB ── */}
         {activeTab === "overview" && (
           <div>
-            {/* View mode toggle */}
+
+
+            {/* Period toggle */}
             <div style={{ display: "flex", gap: "8px", marginBottom: "24px" }}>
               <button style={tabBtn(viewMode === "weekly")}  onClick={() => setViewMode("weekly")}>Weekly</button>
               <button style={tabBtn(viewMode === "monthly")} onClick={() => setViewMode("monthly")}>Monthly</button>
               <button style={tabBtn(viewMode === "yearly")}  onClick={() => setViewMode("yearly")}>Yearly</button>
             </div>
 
-            {/* Period Summary — Weekly / Monthly / Yearly */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px", marginBottom: "24px" }}>
-              {[
-                { period: "This Week",  revenue: weeklyRevenue,  expenses: weeklyExpenses,  profit: weeklyProfit  },
-                { period: "This Month", revenue: monthlyRevenue, expenses: monthlyExpenses, profit: monthlyProfit },
-                { period: "This Year",  revenue: yearlyRevenue,  expenses: yearlyExpenses,  profit: yearlyProfit  },
-              ].map(p => (
-                <div key={p.period} className="acct-card" style={{ backgroundColor: C.white, borderRadius: "6px", border: `1px solid ${C.border}`, padding: "20px", animation: "fadeUp 0.5s ease both" }}>
-                  <p style={{ fontSize: "10px", fontWeight: "700", letterSpacing: "0.14em", textTransform: "uppercase" as const, color: C.gold, marginBottom: "14px" }}>{p.period}</p>
-                  <div style={{ display: "grid", gap: "8px" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px" }}>
-                      <span style={{ color: C.muted }}>Revenue</span>
-                      <span style={{ fontWeight: "700", color: C.gold }}>TT${p.revenue}</span>
-                    </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px" }}>
-                      <span style={{ color: C.muted }}>Expenses</span>
-                      <span style={{ fontWeight: "700", color: "#A03030" }}>TT${p.expenses}</span>
-                    </div>
-                    <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: "8px", display: "flex", justifyContent: "space-between" }}>
-                      <span style={{ fontSize: "11px", fontWeight: "700", color: C.muted }}>Net Profit</span>
-                      <span style={{ fontFamily: FD, fontSize: "16px", fontWeight: "700", color: p.profit >= 0 ? "#1A7A3A" : "#A03030" }}>{p.profit >= 0 ? "+" : ""}TT${p.profit}</span>
-                    </div>
-                  </div>
+            {/* Period breakdown table */}
+            <div className="acct-card" style={{ backgroundColor: C.white, borderRadius: "6px", border: `1px solid ${C.border}`, marginBottom: "24px", overflow: "hidden" }}>
+              <div style={{ padding: "16px 20px", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <p style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "0.1em", textTransform: "uppercase" as const, color: C.gold }}>
+                  {viewMode === "weekly" ? "Week by Week" : viewMode === "monthly" ? "Month by Month" : "Year by Year"} Breakdown
+                </p>
+                <p style={{ fontSize: "11px", color: C.muted }}>Revenue · Expenses · Profit</p>
+              </div>
+              {groupTransactions().length === 0 ? (
+                <p style={{ padding: "32px", color: C.muted, fontSize: "13px", textAlign: "center" as const }}>No data yet</p>
+              ) : (
+                <div>
+                  {groupTransactions().map(([key, group], idx) => {
+                    const txns = group.transactions;
+                    const rev  = txns.filter((t: Transaction) => t.type === "income").reduce((s: number, t: Transaction) => s + t.amount, 0) + group.orderRevenue;
+                    const exp  = txns.filter((t: Transaction) => t.type === "expense").reduce((s: number, t: Transaction) => s + t.amount, 0);
+                    const net  = rev - exp;
+                    const isPos = net >= 0;
+                    return (
+                      <div key={key} style={{ padding: "16px 20px", borderBottom: idx < groupTransactions().length - 1 ? `1px solid ${C.border}` : "none", display: "grid", gridTemplateColumns: "1fr auto", gap: "8px", alignItems: "center" }}>
+                        <div>
+                          <p style={{ fontFamily: FD, fontSize: "15px", color: C.black, marginBottom: "6px" }}>{formatPeriod(key)}</p>
+                          <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" as const }}>
+                            <span style={{ fontSize: "12px", color: C.muted }}>Revenue: <strong style={{ color: C.gold }}>TT${rev}</strong></span>
+                            <span style={{ fontSize: "12px", color: C.muted }}>Expenses: <strong style={{ color: "#A03030" }}>TT${exp}</strong></span>
+                          </div>
+                        </div>
+                        <div style={{ textAlign: "right" as const }}>
+                          <p style={{ fontFamily: FD, fontSize: "20px", color: isPos ? "#1A7A3A" : "#A03030", fontWeight: "600" }}>{isPos ? "+" : ""}TT${net}</p>
+                          <p style={{ fontSize: "10px", color: C.muted, marginTop: "2px" }}>{isPos ? "profit" : "loss"}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {/* Running totals */}
+                  {(() => {
+                    const totalRev = groupTransactions().reduce((s, [, g]) => {
+                      const rev = g.transactions.filter((t: Transaction) => t.type === "income").reduce((a: number, t: Transaction) => a + t.amount, 0) + g.orderRevenue;
+                      return s + rev;
+                    }, 0);
+                    const totalExp = groupTransactions().reduce((s, [, g]) => {
+                      return s + g.transactions.filter((t: Transaction) => t.type === "expense").reduce((a: number, t: Transaction) => a + t.amount, 0);
+                    }, 0);
+                    const totalNet = totalRev - totalExp;
+                    return (
+                      <div style={{ padding: "16px 20px", backgroundColor: C.black, display: "grid", gridTemplateColumns: "1fr auto", gap: "8px", alignItems: "center" }}>
+                        <div>
+                          <p style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "0.1em", textTransform: "uppercase" as const, color: "rgba(255,255,255,0.4)", marginBottom: "4px" }}>
+                            Total ({viewMode === "weekly" ? `${groupTransactions().length} weeks` : viewMode === "monthly" ? `${groupTransactions().length} months` : `${groupTransactions().length} years`})
+                          </p>
+                          <div style={{ display: "flex", gap: "16px" }}>
+                            <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.4)" }}>Revenue: <strong style={{ color: C.gold }}>TT${totalRev}</strong></span>
+                            <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.4)" }}>Expenses: <strong style={{ color: "#F5C6C6" }}>TT${totalExp}</strong></span>
+                          </div>
+                        </div>
+                        <div style={{ textAlign: "right" as const }}>
+                          <p style={{ fontFamily: FD, fontSize: "24px", color: totalNet >= 0 ? "#8FD4A0" : "#F5C6C6" }}>{totalNet >= 0 ? "+" : ""}TT${totalNet}</p>
+                          <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)" }}>net profit</p>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
-              ))}
+              )}
             </div>
 
             {/* Summary cards */}
@@ -457,40 +498,23 @@ Return ONLY a JSON object like this, no other text:
               </div>
             )}
 
-            {/* Period breakdown */}
+            {/* Expense category breakdown */}
             <div style={{ backgroundColor: C.white, borderRadius: "4px", border: `1px solid ${C.border}`, padding: "24px" }}>
-              <p style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "0.1em", textTransform: "uppercase" as const, color: C.gold, marginBottom: "16px" }}>{viewMode === "weekly" ? "Weekly" : "Monthly"} Breakdown</p>
-              {groupTransactions().length === 0 ? (
-                <p style={{ color: C.muted, fontSize: "14px" }}>No transactions yet</p>
+              <p style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "0.1em", textTransform: "uppercase" as const, color: C.gold, marginBottom: "16px" }}>Expenses by Category</p>
+              {expenseByCategory.length === 0 ? (
+                <p style={{ color: C.muted, fontSize: "14px" }}>No expenses logged yet</p>
               ) : (
-                <div style={{ display: "grid", gap: "12px" }}>
-                  {groupTransactions().map(([key, group]) => {
-                    const txns = group.transactions;
-                    const inc = txns.filter((t: Transaction) => t.type === "income").reduce((s: number, t: Transaction) => s + t.amount, 0) + group.orderRevenue;
-                    const exp = txns.filter((t: Transaction) => t.type === "expense").reduce((s: number, t: Transaction) => s + t.amount, 0);
-                    const net = inc - exp;
-                    return (
-                      <div key={key} style={{ padding: "16px 20px", backgroundColor: C.cream, borderRadius: "4px", border: `1px solid ${C.border}` }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap" as const, gap: "8px" }}>
-                          <p style={{ fontFamily: FD, fontSize: "16px", color: C.black }}>{formatPeriod(key)}</p>
-                          <div style={{ display: "flex", gap: "20px" }}>
-                            <div style={{ textAlign: "right" as const }}>
-                              <p style={{ fontSize: "10px", color: C.muted, letterSpacing: "0.08em", textTransform: "uppercase" as const }}>Revenue</p>
-                              <p style={{ fontSize: "15px", fontWeight: "700", color: C.gold }}>TT${inc}</p>
-                            </div>
-                            <div style={{ textAlign: "right" as const }}>
-                              <p style={{ fontSize: "10px", color: C.muted, letterSpacing: "0.08em", textTransform: "uppercase" as const }}>Expenses</p>
-                              <p style={{ fontSize: "15px", fontWeight: "700", color: "#A03030" }}>TT${exp}</p>
-                            </div>
-                            <div style={{ textAlign: "right" as const }}>
-                              <p style={{ fontSize: "10px", color: C.muted, letterSpacing: "0.08em", textTransform: "uppercase" as const }}>Profit</p>
-                              <p style={{ fontSize: "15px", fontWeight: "700", color: net >= 0 ? "#1A7A3A" : "#A03030" }}>{net >= 0 ? "+" : ""}TT${net}</p>
-                            </div>
-                          </div>
-                        </div>
+                <div style={{ display: "grid", gap: "10px" }}>
+                  {expenseByCategory.sort((a, b) => b.total - a.total).map(e => (
+                    <div key={e.cat} style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                      <p style={{ fontSize: "13px", color: C.charcoal, minWidth: "160px" }}>{e.cat}</p>
+                      <div style={{ flex: 1, height: "6px", backgroundColor: C.cream, borderRadius: "3px", overflow: "hidden" }}>
+                        <div style={{ height: "100%", width: `${Math.round((e.total / totalExpenses) * 100)}%`, backgroundColor: C.gold, borderRadius: "3px" }} />
                       </div>
-                    );
-                  })}
+                      <p style={{ fontSize: "13px", fontWeight: "700", color: C.charcoal, minWidth: "80px", textAlign: "right" as const }}>TT${e.total}</p>
+                      <p style={{ fontSize: "11px", color: C.muted, minWidth: "40px" }}>{Math.round((e.total / totalExpenses) * 100)}%</p>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
