@@ -424,15 +424,36 @@ export default function AdminPage() {
     if (!order.notes) return null;
     const m = order.notes.match(/Day:\s*(Thursday|Friday|Saturday)/i);
     if (!m) return null;
+    // Use created_at week to derive the actual pickup date
     const base = new Date(order.created_at);
     const dayMap: Record<string, number> = { thursday: 4, friday: 5, saturday: 6 };
     const target = dayMap[m[1].toLowerCase()];
-    const cur = base.getDay();
-    let diff = target - cur;
+    let diff = target - base.getDay();
     if (diff <= 0) diff += 7;
     const result = new Date(base);
     result.setDate(base.getDate() + diff);
-    return result.toISOString().split("T")[0];
+    const yy = result.getFullYear();
+    const mm = String(result.getMonth() + 1).padStart(2, "0");
+    const dd = String(result.getDate()).padStart(2, "0");
+    return `${yy}-${mm}-${dd}`;
+  }
+
+  // Monday-Sunday week key in TT timezone
+  function getWeekKeyTT(dateStr: string): string {
+    const d = new Date(dateStr + "T12:00:00-04:00");
+    const dow = d.getDay();
+    const daysBack = dow === 0 ? 6 : dow - 1;
+    const mon = new Date(d);
+    mon.setDate(d.getDate() - daysBack);
+    const yy = mon.getFullYear();
+    const mm = String(mon.getMonth() + 1).padStart(2, "0");
+    const dd = String(mon.getDate()).padStart(2, "0");
+    return `${yy}-${mm}-${dd}`;
+  }
+
+  function inWeek(dateStr: string, weekStart: Date, weekEnd: Date): boolean {
+    const d = new Date(dateStr + "T12:00:00-04:00");
+    return d >= weekStart && d <= weekEnd;
   }
 
   const completedOrders = orders.filter(o => o.status === "completed");
@@ -870,28 +891,50 @@ export default function AdminPage() {
           <h3 style={{ fontFamily: FONT_DISPLAY, fontSize: "20px", fontWeight: "400", color: C.black, marginBottom: "20px" }}>Completed Orders Only</h3>
           {(() => {
             const now = new Date();
+            const nowDow = now.getDay();
+            const daysBack = nowDow === 0 ? 6 : nowDow - 1;
 
-            // Weekly - use fulfilment date
-            const weekStart = new Date(now);
-            weekStart.setDate(now.getDate() - now.getDay() + (now.getDay() === 0 ? -6 : 1));
-            weekStart.setHours(0,0,0,0);
-            const weekRevenue = completedOrders.filter(o => { const fd = getFulfilmentDate(o) || o.created_at.split("T")[0]; return new Date(fd) >= weekStart; }).reduce((s, o) => s + o.total, 0);
-            const weekCount   = completedOrders.filter(o => { const fd = getFulfilmentDate(o) || o.created_at.split("T")[0]; return new Date(fd) >= weekStart; }).length;
+            // This Week: Monday-Sunday
+            const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysBack, 0, 0, 0);
+            const weekEnd   = new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysBack + 6, 23, 59, 59);
 
-            // Monthly
+            // Last Week: Monday-Sunday
+            const lwStart = new Date(weekStart); lwStart.setDate(weekStart.getDate() - 7);
+            const lwEnd   = new Date(weekEnd);   lwEnd.setDate(weekEnd.getDate() - 7);
+
+            // Monthly, Yearly
             const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-            const monthRevenue = completedOrders.filter(o => { const fd = getFulfilmentDate(o) || o.created_at.split("T")[0]; return new Date(fd) >= monthStart; }).reduce((s, o) => s + o.total, 0);
-            const monthCount   = completedOrders.filter(o => { const fd = getFulfilmentDate(o) || o.created_at.split("T")[0]; return new Date(fd) >= monthStart; }).length;
+            const yearStart  = new Date(now.getFullYear(), 0, 1);
 
-            // Yearly
-            const yearStart = new Date(now.getFullYear(), 0, 1);
-            const yearRevenue = completedOrders.filter(o => { const fd = getFulfilmentDate(o) || o.created_at.split("T")[0]; return new Date(fd) >= yearStart; }).reduce((s, o) => s + o.total, 0);
-            const yearCount   = completedOrders.filter(o => { const fd = getFulfilmentDate(o) || o.created_at.split("T")[0]; return new Date(fd) >= yearStart; }).length;
+            // Strict fulfilment date only
+            const withFD = completedOrders.filter(o => getFulfilmentDate(o));
+            const weekRevenue  = withFD.filter(o => inWeek(getFulfilmentDate(o)!, weekStart, weekEnd)).reduce((s, o) => s + o.total, 0);
+            const weekCount    = withFD.filter(o => inWeek(getFulfilmentDate(o)!, weekStart, weekEnd)).length;
+            const lwRevenue    = withFD.filter(o => inWeek(getFulfilmentDate(o)!, lwStart, lwEnd)).reduce((s, o) => s + o.total, 0);
+            const lwCount      = withFD.filter(o => inWeek(getFulfilmentDate(o)!, lwStart, lwEnd)).length;
+            const monthRevenue = withFD.filter(o => new Date(getFulfilmentDate(o)! + "T12:00:00-04:00") >= monthStart).reduce((s, o) => s + o.total, 0);
+            const monthCount   = withFD.filter(o => new Date(getFulfilmentDate(o)! + "T12:00:00-04:00") >= monthStart).length;
+            const yearRevenue  = withFD.filter(o => new Date(getFulfilmentDate(o)! + "T12:00:00-04:00") >= yearStart).reduce((s, o) => s + o.total, 0);
+            const yearCount    = withFD.filter(o => new Date(getFulfilmentDate(o)! + "T12:00:00-04:00") >= yearStart).length;
+
+            // Expected (pending) orders for this week
+            const weekExpected = orders.filter(o => ["new","confirmed","ready"].includes(o.status) && getFulfilmentDate(o) && inWeek(getFulfilmentDate(o)!, weekStart, weekEnd));
+            const weekExpectedRev = weekExpected.reduce((s, o) => s + o.total, 0);
 
             return (
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: "12px" }}>
+                {/* Current week — show earned AND expected separately */}
+                <div style={{ backgroundColor: weekRevenue > 0 ? "#EAFFF0" : C.cream, borderRadius: "6px", border: `1px solid ${weekRevenue > 0 ? "#8FD4A0" : C.border}`, padding: "16px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
+                    <p style={{ fontSize: "10px", fontWeight: "700", letterSpacing: "0.12em", textTransform: "uppercase" as const, color: C.muted }}>This Week</p>
+                    <span>📅</span>
+                  </div>
+                  <p style={{ fontFamily: FONT_DISPLAY, fontSize: "20px", color: "#1A7A3A", marginBottom: "2px" }}>TT${weekRevenue} earned</p>
+                  <p style={{ fontSize: "11px", color: C.muted, marginBottom: "4px" }}>{weekCount} completed</p>
+                  {weekExpectedRev > 0 && <p style={{ fontSize: "11px", color: "#B8600A" }}>+ TT${weekExpectedRev} expected ({weekExpected.length} pending)</p>}
+                </div>
                 {[
-                  { label: "This Week",  revenue: weekRevenue,  count: weekCount,  icon: "📅" },
+                  { label: "Last Week",  revenue: lwRevenue,    count: lwCount,    icon: "📅" },
                   { label: "This Month", revenue: monthRevenue, count: monthCount, icon: "📆" },
                   { label: "This Year",  revenue: yearRevenue,  count: yearCount,  icon: "🗓️" },
                   { label: "All Time",   revenue: totalRevenue, count: completedOrders.length, icon: "💰" },

@@ -1228,9 +1228,6 @@ export default function Home() {
           </div>
           <div style={{ display: "flex", gap: "24px", flexWrap: "wrap" as const }}>
             <a href="https://instagram.com/theclub.boils" target="_blank" rel="noopener noreferrer" style={{ color: muted, textDecoration: "none", fontSize: "11px", letterSpacing: "0.08em", transition: "color 0.2s" }} onMouseEnter={e => (e.currentTarget.style.color = gold)} onMouseLeave={e => (e.currentTarget.style.color = muted)}>@theclub.boils</a>
-            <a href="https://wa.me/18682930570?text=Hi%2C%20I%27d%20like%20some%20information%20about%20ordering%20from%20The%20Club%20Boils." target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: "8px", backgroundColor: "#25D366", color: white, padding: "10px 20px", borderRadius: "4px", textDecoration: "none", fontFamily: "'Inter', sans-serif", fontSize: "13px", fontWeight: "600", letterSpacing: "0.04em", marginBottom: "10px" }}>
-                WhatsApp Us
-              </a>
               <a href="tel:8682930570" style={{ color: muted, textDecoration: "none", fontSize: "11px", letterSpacing: "0.08em", transition: "color 0.2s" }} onMouseEnter={e => (e.currentTarget.style.color = gold)} onMouseLeave={e => (e.currentTarget.style.color = muted)}>868-293-0570</a>
             <span style={{ color: muted, fontSize: "11px", letterSpacing: "0.08em" }}>Arima, Trinidad</span>
           </div>

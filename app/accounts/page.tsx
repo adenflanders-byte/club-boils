@@ -52,12 +52,21 @@ function toTT(d: Date): Date {
 function ttDateStr(d: Date): string {
   return toTT(d).toISOString().split("T")[0];
 }
+// Returns the Monday date of the Mon-Sun business week for a given date string
+// Uses noon TT time to avoid UTC boundary issues
 function getWeekKey(dateStr: string): string {
+  // Parse in TT timezone by appending noon TT offset
   const d = new Date(dateStr + "T12:00:00-04:00");
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-  const mon = new Date(d); mon.setDate(diff);
-  return mon.toISOString().split("T")[0];
+  const dow = d.getDay(); // 0=Sun, 1=Mon ... 6=Sat
+  // Days back to Monday: Sun=6, Mon=0, Tue=1 ... Sat=5
+  const daysBack = dow === 0 ? 6 : dow - 1;
+  const mon = new Date(d);
+  mon.setDate(d.getDate() - daysBack);
+  // Format as YYYY-MM-DD using TT date parts
+  const yy = mon.getFullYear();
+  const mm = String(mon.getMonth() + 1).padStart(2, "0");
+  const dd = String(mon.getDate()).padStart(2, "0");
+  return `${yy}-${mm}-${dd}`;
 }
 function getMonthKey(dateStr: string): string { return dateStr.slice(0, 7); }
 function getYearKey(dateStr: string):  string { return dateStr.slice(0, 4); }
@@ -252,23 +261,29 @@ export default function AccountsPage() {
   }
 
   // ── Financial calculations ─────────────────────────────────────────
-  function getPeriodDates() {
+  function getPeriodDates(): [Date, Date] {
+    // All dates computed in TT timezone (America/Port_of_Spain, UTC-4)
     const now = toTT(new Date());
-    const y = now.getFullYear(), m = now.getMonth(), d = now.getDate();
-    const dow = now.getDay();
-    const weekStart = new Date(now); weekStart.setDate(d - dow + (dow === 0 ? -6 : 1)); weekStart.setHours(0,0,0,0);
-    const weekEnd   = new Date(weekStart); weekEnd.setDate(weekStart.getDate() + 6);
-    const lwStart   = new Date(weekStart); lwStart.setDate(weekStart.getDate() - 7);
-    const lwEnd     = new Date(weekEnd);   lwEnd.setDate(weekEnd.getDate() - 7);
-    const monthStart  = new Date(y, m, 1);
-    const monthEnd    = new Date(y, m + 1, 0);
-    const lmStart     = new Date(y, m - 1, 1);
-    const lmEnd       = new Date(y, m, 0);
-    const yearStart   = new Date(y, 0, 1);
-    const yearEnd     = new Date(y, 11, 31);
+    const y = now.getFullYear(), mo = now.getMonth(), d = now.getDate();
+
+    // Monday-Sunday business week
+    const dow = now.getDay(); // 0=Sun...6=Sat
+    const daysBack = dow === 0 ? 6 : dow - 1; // days since last Monday
+    const monStart = new Date(y, mo, d - daysBack, 0, 0, 0);
+    const sunEnd   = new Date(y, mo, d - daysBack + 6, 23, 59, 59);
+    const lwMon    = new Date(y, mo, d - daysBack - 7, 0, 0, 0);
+    const lwSun    = new Date(y, mo, d - daysBack - 1, 23, 59, 59);
+
+    const monthStart  = new Date(y, mo, 1, 0, 0, 0);
+    const monthEnd    = new Date(y, mo + 1, 0, 23, 59, 59);
+    const lmStart     = new Date(y, mo - 1, 1, 0, 0, 0);
+    const lmEnd       = new Date(y, mo, 0, 23, 59, 59);
+    const yearStart   = new Date(y, 0, 1, 0, 0, 0);
+    const yearEnd     = new Date(y, 11, 31, 23, 59, 59);
+
     const map: Record<string, [Date, Date]> = {
-      week:      [weekStart,  weekEnd],
-      lastweek:  [lwStart,    lwEnd],
+      week:      [monStart,  sunEnd],
+      lastweek:  [lwMon,     lwSun],
       month:     [monthStart, monthEnd],
       lastmonth: [lmStart,    lmEnd],
       year:      [yearStart,  yearEnd],
@@ -279,7 +294,8 @@ export default function AccountsPage() {
 
   function inPeriod(dateStr: string): boolean {
     const [start, end] = getPeriodDates();
-    const d = new Date(dateStr + "T12:00:00");
+    // Parse at noon TT to avoid UTC date shifting
+    const d = new Date(dateStr + "T12:00:00-04:00");
     return d >= start && d <= end;
   }
 
@@ -288,14 +304,16 @@ export default function AccountsPage() {
   const expectedOrders  = orders.filter(o => ["new","confirmed","ready"].includes(o.status));
   const cancelledOrders = orders.filter(o => o.status === "cancelled");
 
+  // STRICT: only use fulfilment date. If missing, exclude from period totals (flagged in health check).
   const periodCompletedOrders = completedOrders.filter(o => {
-    const fd = getFulfilmentDate(o) || o.created_at.split("T")[0];
-    return inPeriod(fd);
+    const fd = getFulfilmentDate(o);
+    return fd ? inPeriod(fd) : false; // missing fulfilment date → Unassigned, not included
   });
   const periodExpectedOrders = expectedOrders.filter(o => {
-    const fd = getFulfilmentDate(o) || o.created_at.split("T")[0];
-    return inPeriod(fd);
+    const fd = getFulfilmentDate(o);
+    return fd ? inPeriod(fd) : false;
   });
+  const unassignedOrders = orders.filter(o => !getFulfilmentDate(o) && o.status !== "cancelled");
 
   const earnedRevenue   = periodCompletedOrders.reduce((s, o) => s + o.total, 0);
   const expectedRevenue = periodExpectedOrders.reduce((s, o) => s + o.total, 0);
@@ -310,45 +328,70 @@ export default function AccountsPage() {
   const profitMargin   = earnedRevenue > 0 ? ((netProfit / earnedRevenue) * 100).toFixed(1) : "0";
   const avgOrderValue  = periodCompletedOrders.length > 0 ? Math.round(earnedRevenue / periodCompletedOrders.length) : 0;
 
-  // Payment breakdown
-  const bankOrders  = completedOrders.filter(o => o.notes && o.notes.includes("Bank Transfer"));
-  const cashOrders  = completedOrders.filter(o => o.notes && o.notes.includes("Cash on Delivery"));
-  const unclassified= completedOrders.filter(o => !o.notes?.includes("Bank Transfer") && !o.notes?.includes("Cash on Delivery"));
+  // Payment breakdown — uses period-filtered completed orders (not all time)
+  const paymentBase  = periodFilter === "all" ? completedOrders : periodCompletedOrders;
+  const bankOrders   = paymentBase.filter(o => o.notes && o.notes.includes("Bank Transfer"));
+  const cashOrders   = paymentBase.filter(o => o.notes && o.notes.includes("Cash on Delivery"));
+  const unclassified = paymentBase.filter(o => !o.notes?.includes("Bank Transfer") && !o.notes?.includes("Cash on Delivery"));
 
   // Health checks
   const healthIssues: string[] = [];
-  orders.forEach(o => {
-    if (!getFulfilmentDate(o)) healthIssues.push(`Order #${o.id.slice(0,8)} — ${o.name}: missing fulfilment date`);
+  orders.filter(o => o.status !== "cancelled").forEach(o => {
+    const fd = getFulfilmentDate(o);
+    if (!fd) healthIssues.push(`⚠️ Order #${o.id.slice(0,8)} — ${o.name} (TT$${o.total}): missing fulfilment date — placed in Unassigned/Needs Review`);
     if (o.status === "completed" && !o.notes?.includes("Bank Transfer") && !o.notes?.includes("Cash on Delivery"))
-      healthIssues.push(`Order #${o.id.slice(0,8)} — ${o.name}: completed but payment method unclassified`);
+      healthIssues.push(`⚠️ Order #${o.id.slice(0,8)} — ${o.name} (TT$${o.total}): completed but payment method unclassified`);
   });
   transactions.forEach(t => {
     if (t.amount <= 0) healthIssues.push(`Transaction ${t.id.slice(0,8)}: invalid amount ${t.amount}`);
   });
 
   // Period label
+  // Period label shows exact date range for weeks
+  function getPeriodLabel(): string {
+    const fmt = (d: Date) => d.toLocaleDateString("en-TT", { month: "short", day: "numeric" });
+    const fmtFull = (d: Date) => d.toLocaleDateString("en-TT", { month: "short", day: "numeric", year: "numeric" });
+    const [s, e] = getPeriodDates();
+    if (periodFilter === "week") return `This Week (${fmt(s)} – ${fmtFull(e)})`;
+    if (periodFilter === "lastweek") return `Last Week (${fmt(s)} – ${fmtFull(e)})`;
+    if (periodFilter === "month") return `This Month (${s.toLocaleDateString("en-TT", { month: "long", year: "numeric" })})`;
+    if (periodFilter === "lastmonth") return `Last Month (${s.toLocaleDateString("en-TT", { month: "long", year: "numeric" })})`;
+    if (periodFilter === "year") return `This Year (${s.getFullYear()})`;
+    return "All Time";
+  }
   const periodLabels: Record<string, string> = {
     week: "This Week", lastweek: "Last Week", month: "This Month",
     lastmonth: "Last Month", year: "This Year", all: "All Time",
   };
 
-  // Grouped breakdown - respects period filter
+  // Week by week breakdown — for "all time" shows every week, otherwise shows selected period
   function getBreakdownGroups() {
-    const groups: Record<string, { earnedRevenue: number; expenses: number; orders: number }> = {};
-    completedOrders
-      .filter(o => { const fd = getFulfilmentDate(o) || o.created_at.split("T")[0]; return inPeriod(fd); })
-      .forEach(o => {
-        const fd  = getFulfilmentDate(o) || o.created_at.split("T")[0];
-        const key = getWeekKey(fd);
-        if (!groups[key]) groups[key] = { earnedRevenue: 0, expenses: 0, orders: 0 };
-        groups[key].earnedRevenue += o.total;
-        groups[key].orders++;
-      });
-    periodTx.filter(t => t.type === "expense").forEach(t => {
-      const key = getWeekKey(t.date);
-      if (!groups[key]) groups[key] = { earnedRevenue: 0, expenses: 0, orders: 0 };
-      groups[key].expenses += t.amount;
+    const groups: Record<string, { earnedRevenue: number; expenses: number; orders: number; cogs: number; opEx: number }> = {};
+
+    // Only completed orders with a valid fulfilment date
+    const ordersToShow = periodFilter === "all"
+      ? completedOrders.filter(o => getFulfilmentDate(o))
+      : periodCompletedOrders;
+
+    ordersToShow.forEach(o => {
+      const fd  = getFulfilmentDate(o)!;
+      const key = getWeekKey(fd);
+      if (!groups[key]) groups[key] = { earnedRevenue: 0, expenses: 0, orders: 0, cogs: 0, opEx: 0 };
+      groups[key].earnedRevenue += o.total;
+      groups[key].orders++;
     });
+
+    // Expenses: all time shows all, selected period shows period
+    const txToShow = periodFilter === "all" ? transactions : periodTx;
+    txToShow.filter(t => t.type === "expense").forEach(t => {
+      const key = getWeekKey(t.date);
+      if (!groups[key]) groups[key] = { earnedRevenue: 0, expenses: 0, orders: 0, cogs: 0, opEx: 0 };
+      const isCogs = ["Ingredients","Packaging"].includes(t.category);
+      groups[key].expenses += t.amount;
+      if (isCogs) groups[key].cogs += t.amount;
+      else groups[key].opEx += t.amount;
+    });
+
     return Object.entries(groups).sort((a, b) => b[0].localeCompare(a[0]));
   }
 
@@ -464,7 +507,7 @@ export default function AccountsPage() {
           {/* ── OVERVIEW ── */}
           {activeTab === "overview" && (
             <div>
-              <p style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "0.14em", color: C.gold, marginBottom: "20px", textTransform: "uppercase" as const }}>{periodLabels[periodFilter]}</p>
+              <p style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "0.14em", color: C.gold, marginBottom: "20px", textTransform: "uppercase" as const }}>{getPeriodLabel()}</p>
 
               {/* Key metric cards */}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "12px", marginBottom: "24px" }}>
@@ -475,7 +518,7 @@ export default function AccountsPage() {
                   { label: "Cost of Goods",    value: `TT$${cogs}`,            color: C.red,   bg: C.redBg,   tip: "Ingredients and Packaging costs — directly tied to producing your menu items.", sub: "ingredients + packaging" },
                   { label: "Operating Expenses",value: `TT$${opExpenses}`,     color: C.red,   bg: C.redBg,   tip: "All other business expenses: gas, marketing, equipment, etc.", sub: "all other expenses" },
                   { label: "Gross Profit",     value: `${grossProfit >= 0 ? "+" : ""}TT$${grossProfit}`, color: grossProfit >= 0 ? C.green : C.red, bg: grossProfit >= 0 ? C.greenBg : C.redBg, tip: "Earned Revenue minus Cost of Goods Sold. Profit before operating expenses.", sub: "revenue - COGS" },
-                  { label: "Net Profit",       value: `${netProfit >= 0 ? "+" : ""}TT$${netProfit}`, color: netProfit >= 0 ? C.green : C.red, bg: netProfit >= 0 ? C.greenBg : C.redBg, tip: "Gross Profit + Other Income - Operating Expenses. Your bottom line.", sub: `${profitMargin}% margin` },
+                  { label: earnedRevenue > 0 ? "Net Profit" : "Projected Profit", value: `${netProfit >= 0 ? "+" : ""}TT$${netProfit}`, color: earnedRevenue > 0 ? (netProfit >= 0 ? C.green : C.red) : C.amber, bg: earnedRevenue > 0 ? (netProfit >= 0 ? C.greenBg : C.redBg) : C.amberBg, tip: earnedRevenue > 0 ? "Net Profit = Gross Profit + Other Income - Operating Expenses." : "Projected only — no completed orders yet. Expenses minus forecast revenue.", sub: earnedRevenue > 0 ? `${profitMargin}% margin` : "forecast only" },
                   { label: "Avg Order Value",  value: `TT$${avgOrderValue}`,   color: C.charcoal, bg: C.cream, tip: "Average value of completed orders in this period.", sub: "per completed order" },
                 ].map(c => (
                   <div key={c.label} className="acct-card" style={{ backgroundColor: c.bg, borderRadius: "6px", border: `1px solid ${c.color}33`, padding: "18px", animation: "fadeUp 0.5s ease both" }}>
@@ -507,7 +550,8 @@ export default function AccountsPage() {
                             <p style={{ fontFamily: FD, fontSize: "14px", color: C.black, marginBottom: "4px" }}>{label}</p>
                             <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" as const }}>
                               <span style={{ fontSize: "11px", color: C.muted }}>Revenue: <strong style={{ color: C.green }}>TT${g.earnedRevenue}</strong> ({g.orders} orders)</span>
-                              <span style={{ fontSize: "11px", color: C.muted }}>Expenses: <strong style={{ color: C.red }}>TT${g.expenses}</strong></span>
+                              <span style={{ fontSize: "11px", color: C.muted }}>COGS: <strong style={{ color: C.red }}>TT${g.cogs}</strong></span>
+                              <span style={{ fontSize: "11px", color: C.muted }}>OpEx: <strong style={{ color: C.red }}>TT${g.opEx}</strong></span>
                             </div>
                           </div>
                           <div style={{ textAlign: "right" as const }}>
@@ -526,7 +570,7 @@ export default function AccountsPage() {
                       return (
                         <div style={{ padding: "14px 16px", backgroundColor: C.black, borderRadius: "4px", marginTop: "12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                           <div>
-                            <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.4)", letterSpacing: "0.1em", textTransform: "uppercase" as const, marginBottom: "4px" }}>Total — {periodLabels[periodFilter]} ({groups.length} week{groups.length !== 1 ? "s" : ""})</p>
+                            <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.4)", letterSpacing: "0.1em", textTransform: "uppercase" as const, marginBottom: "4px" }}>Total — {getPeriodLabel()} ({groups.length} week{groups.length !== 1 ? "s" : ""})</p>
                             <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)" }}>Revenue: TT${totalRev} · Expenses: TT${totalExp}</p>
                           </div>
                           <p style={{ fontFamily: FD, fontSize: "22px", color: totalNet >= 0 ? "#8FD4A0" : "#F5C6C6" }}>{totalNet >= 0 ? "+" : ""}TT${totalNet}</p>
@@ -539,7 +583,7 @@ export default function AccountsPage() {
 
               {/* Payment breakdown */}
               <div className="acct-card" style={{ ...card(), marginBottom: "24px" }}>
-                <p style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "0.1em", textTransform: "uppercase" as const, color: C.gold, marginBottom: "16px" }}>Payment Breakdown (All Completed Orders)</p>
+                <p style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "0.1em", textTransform: "uppercase" as const, color: C.gold, marginBottom: "16px" }}>Payment Breakdown — {getPeriodLabel()}</p>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "12px" }}>
                   {[
                     { label: "Bank Transfer", orders: bankOrders, color: "#1A56A4", bg: "#EBF3FF", border: "#B8D4F5" },
@@ -559,7 +603,12 @@ export default function AccountsPage() {
                     </div>
                   ))}
                 </div>
-                {unclassified.length > 0 && (
+                {unassignedOrders.length > 0 && (
+                <div style={{ marginTop: "12px", padding: "12px 16px", backgroundColor: C.redBg, border: `1px solid ${C.redBorder}`, borderRadius: "4px", fontSize: "12px", color: C.red }}>
+                  ⚠️ {unassignedOrders.length} order{unassignedOrders.length !== 1 ? "s" : ""} have no fulfilment date and are excluded from period totals: {unassignedOrders.map(o => `${o.name} (TT$${o.total})`).join(", ")}. Edit these orders in Admin to assign a day.
+                </div>
+              )}
+              {unclassified.length > 0 && (
                   <div style={{ marginTop: "12px", padding: "12px 16px", backgroundColor: C.amberBg, border: `1px solid ${C.amberBorder}`, borderRadius: "4px", fontSize: "12px", color: C.amber }}>
                     ⚠️ {unclassified.length} completed order{unclassified.length !== 1 ? "s" : ""} {unclassified.length === 1 ? "has" : "have"} no payment method recorded. Please edit these orders to add a payment method.
                   </div>
@@ -571,15 +620,17 @@ export default function AccountsPage() {
                 <p style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "0.1em", textTransform: "uppercase" as const, color: C.gold, marginBottom: "16px" }}>Reconciliation Summary</p>
                 <div style={{ display: "grid", gap: "8px" }}>
                   {[
-                    { label: "Total Orders",        value: orders.length,                       color: C.charcoal },
-                    { label: "Completed (Earned)",  value: completedOrders.length,              color: C.green },
-                    { label: "Pending (Expected)",  value: expectedOrders.length,               color: C.amber },
-                    { label: "Cancelled",           value: cancelledOrders.length,              color: C.red },
-                    { label: "Total Earned Revenue",value: `TT$${completedOrders.reduce((s,o)=>s+o.total,0)}`, color: C.green },
-                    { label: "Expected (Forecast)", value: `TT$${expectedOrders.reduce((s,o)=>s+o.total,0)}`,  color: C.amber },
-                    { label: "Bank Transfer Total", value: `TT$${bankOrders.reduce((s,o)=>s+o.total,0)}`,      color: "#1A56A4" },
-                    { label: "Cash Total",          value: `TT$${cashOrders.reduce((s,o)=>s+o.total,0)}`,      color: C.green },
-                    { label: "Unclassified",        value: `TT$${unclassified.reduce((s,o)=>s+o.total,0)}`,    color: C.amber },
+                    { label: "Period",                   value: getPeriodLabel(),                                                       color: C.gold },
+                    { label: "Completed Orders (Period)",value: periodCompletedOrders.length,                                         color: C.green },
+                    { label: "Earned Revenue (Period)",  value: `TT$${earnedRevenue}`,                                                color: C.green },
+                    { label: "Expected Orders (Period)", value: periodExpectedOrders.length,                                          color: C.amber },
+                    { label: "Expected Revenue (Period)",value: `TT$${expectedRevenue}`,                                             color: C.amber },
+                    { label: "Cancelled (All Time)",     value: cancelledOrders.length,                                              color: C.red },
+                    { label: "Unassigned (No Date)",     value: unassignedOrders.length,                                             color: C.red },
+                    { label: "Bank Transfer (Period)",   value: `TT$${bankOrders.reduce((s,o)=>s+o.total,0)} (${bankOrders.length})`, color: "#1A56A4" },
+                    { label: "Cash (Period)",            value: `TT$${cashOrders.reduce((s,o)=>s+o.total,0)} (${cashOrders.length})`, color: C.green },
+                    { label: "Unclassified (Period)",    value: `TT$${unclassified.reduce((s,o)=>s+o.total,0)} (${unclassified.length})`, color: C.amber },
+                    { label: "Bank + Cash + Unclassified",value: `TT$${paymentBase.reduce((s,o)=>s+o.total,0)} (should = TT$${earnedRevenue})`, color: paymentBase.reduce((s,o)=>s+o.total,0) === earnedRevenue ? C.green : C.red },
                   ].map(r => (
                     <div key={r.label} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${C.border}`, fontSize: "13px" }}>
                       <span style={{ color: C.muted }}>{r.label}</span>
@@ -594,7 +645,7 @@ export default function AccountsPage() {
           {/* ── PROFIT & LOSS ── */}
           {activeTab === "pl" && (
             <div>
-              <p style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "0.14em", color: C.gold, marginBottom: "20px", textTransform: "uppercase" as const }}>Profit & Loss — {periodLabels[periodFilter]}</p>
+              <p style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "0.14em", color: C.gold, marginBottom: "20px", textTransform: "uppercase" as const }}>Profit & Loss — {getPeriodLabel()}</p>
               <div className="acct-card" style={{ ...card() }}>
                 {[
                   { label: "Earned Revenue",     value: earnedRevenue,   color: C.green,    indent: false, tip: "Completed orders only, by fulfilment date." },
@@ -622,7 +673,7 @@ export default function AccountsPage() {
           {/* ── CASH FLOW ── */}
           {activeTab === "cashflow" && (
             <div>
-              <p style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "0.14em", color: C.gold, marginBottom: "20px", textTransform: "uppercase" as const }}>Cash Flow — {periodLabels[periodFilter]}</p>
+              <p style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "0.14em", color: C.gold, marginBottom: "20px", textTransform: "uppercase" as const }}>Cash Flow — {getPeriodLabel()}</p>
               {(() => {
                 const cashIn  = earnedRevenue + otherIncome;
                 const cashOut = totalExpenses;
