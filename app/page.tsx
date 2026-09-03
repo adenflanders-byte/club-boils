@@ -160,52 +160,58 @@ export default function Home() {
 
   useEffect(() => {
     function getNextOrderInfo() {
-      const now = new Date();
-      // Day schedule: cutoff night before at 8PM
-      // Thursday orders close Wednesday 8PM (day 3)
-      // Friday orders close Thursday 8PM (day 4)
-      // Saturday orders close Friday 8PM (day 5)
-      const schedule = [
-        { orderDay: "Thursday", cutoffDay: 3, label: "Thursday" },
-        { orderDay: "Friday",   cutoffDay: 4, label: "Friday"   },
-        { orderDay: "Saturday", cutoffDay: 5, label: "Saturday" },
+      // All times in TT timezone (America/Port_of_Spain, UTC-4)
+      const nowUTC = new Date();
+      const nowTT  = new Date(nowUTC.toLocaleString("en-US", { timeZone: "America/Port_of_Spain" }));
+
+      // Fulfilment days with their JS getDay() numbers
+      // Rollover rule: Thursday → target Friday, Friday → target Saturday, Saturday → target next Thursday
+      // On any day, we find the NEXT enabled fulfilment day that is strictly in the future
+      // Cutoff is 8PM TT the night BEFORE the fulfilment day
+
+      const dayOrder = [
+        { name: "Thursday", key: "thursday" as const, dayNum: 4 },
+        { name: "Friday",   key: "friday"   as const, dayNum: 5 },
+        { name: "Saturday", key: "saturday" as const, dayNum: 6 },
       ];
 
-      // Filter to only open days
-      const activeDays = schedule.filter(s => {
-        const key = s.orderDay.toLowerCase() as keyof typeof openDays;
-        return openDays[key];
-      });
+      // Get the next fulfilment date strictly after now
+      // Search up to 14 days ahead
+      for (let daysAhead = 1; daysAhead <= 14; daysAhead++) {
+        const candidate = new Date(nowTT);
+        candidate.setDate(nowTT.getDate() + daysAhead);
+        const candidateDow = candidate.getDay();
 
-      if (activeDays.length === 0) {
-        return { days: 0, hours: 0, minutes: 0, seconds: 0, closed: true, orderDay: "", cutoffDay: "" };
-      }
+        const slot = dayOrder.find(d => d.dayNum === candidateDow && openDays[d.key]);
+        if (!slot) continue;
 
-      // Find next available cutoff
-      for (let week = 0; week < 2; week++) {
-        for (const slot of activeDays) {
-          const target = new Date();
-          const currentDay = target.getDay();
-          let diff = slot.cutoffDay - currentDay + (week * 7);
-          if (diff < 0) diff += 7;
-          target.setDate(target.getDate() + diff);
-          target.setHours(20, 0, 0, 0);
-          if (target > now) {
-            const ms = target.getTime() - now.getTime();
-            return {
-              days:    Math.floor(ms / (1000 * 60 * 60 * 24)),
-              hours:   Math.floor((ms % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
-              minutes: Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60)),
-              seconds: Math.floor((ms % (1000 * 60)) / 1000),
-              closed: false,
-              orderDay: slot.orderDay,
-              cutoffDay: slot.label,
-            };
-          }
+        // Cutoff is 8PM TT the night before (i.e. daysAhead - 1 days from now at 20:00)
+        const cutoff = new Date(nowTT);
+        cutoff.setDate(nowTT.getDate() + daysAhead - 1);
+        cutoff.setHours(20, 0, 0, 0);
+
+        // If cutoff hasn't passed yet, this is our target
+        if (cutoff > nowTT) {
+          const ms = cutoff.getTime() - nowTT.getTime();
+          const cutoffDayName = new Date(cutoff).toLocaleDateString("en-US", { weekday: "long" });
+          return {
+            days:    Math.floor(ms / (1000 * 60 * 60 * 24)),
+            hours:   Math.floor((ms % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
+            minutes: Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60)),
+            seconds: Math.floor((ms % (1000 * 60)) / 1000),
+            closed:  false,
+            orderDay:  slot.name,
+            cutoffDay: cutoffDayName,
+            fulfilmentDate: candidate.toISOString().split("T")[0],
+          };
         }
+
+        // Cutoff has passed — orders for this day are closed, try next
       }
-      return { days: 0, hours: 0, minutes: 0, seconds: 0, closed: true, orderDay: "", cutoffDay: "" };
+
+      return { days: 0, hours: 0, minutes: 0, seconds: 0, closed: true, orderDay: "", cutoffDay: "", fulfilmentDate: "" };
     }
+
     setTimeLeft(getNextOrderInfo() as any);
     const interval = setInterval(() => setTimeLeft(getNextOrderInfo() as any), 1000);
     return () => clearInterval(interval);
@@ -633,7 +639,7 @@ export default function Home() {
             {!timeLeft.closed ? (
               <div style={{ marginBottom: "48px" }}>
                 <p style={{ fontSize: "10px", fontWeight: "700", letterSpacing: "0.18em", textTransform: "uppercase" as const, color: gold, marginBottom: "24px" }}>
-                  Orders for {timeLeft.orderDay} close {timeLeft.cutoffDay === timeLeft.orderDay ? "the night before" : `${timeLeft.cutoffDay} night`} at 8PM
+                  Orders for {timeLeft.orderDay} close {timeLeft.cutoffDay} night at 8PM
                 </p>
                 <div style={{ display: "flex", gap: "clamp(8px, 2vw, 20px)", justifyContent: "center", flexWrap: "wrap" as const }}>
                   {[
@@ -1015,6 +1021,7 @@ export default function Home() {
                       { id: "saturday", label: "Saturday" },
                     ].map(day => {
                       const isOpen = openDays[day.id as keyof typeof openDays];
+                      const isRecommended = timeLeft.orderDay?.toLowerCase() === day.id;
                       return (
                         <button
                           key={day.id}
@@ -1022,15 +1029,16 @@ export default function Home() {
                           disabled={!isOpen}
                           style={{
                             padding: "14px 8px", borderRadius: "2px", cursor: isOpen ? "pointer" : "not-allowed",
-                            border: orderDay === day.id ? `1px solid ${gold}` : `1px solid ${border}`,
-                            backgroundColor: !isOpen ? "rgba(0,0,0,0.04)" : orderDay === day.id ? goldDim : "transparent",
+                            border: orderDay === day.id ? `1px solid ${gold}` : isRecommended ? `1px solid ${gold}` : `1px solid ${border}`,
+                            backgroundColor: !isOpen ? "rgba(0,0,0,0.04)" : orderDay === day.id ? goldDim : isRecommended ? "rgba(196,149,42,0.05)" : "transparent",
                             fontFamily: "'Inter', sans-serif", fontSize: "13px",
                             fontWeight: orderDay === day.id ? "700" : "400",
-                            color: !isOpen ? muted : orderDay === day.id ? gold : muted,
+                            color: !isOpen ? muted : orderDay === day.id ? gold : isRecommended ? gold : muted,
                             opacity: isOpen ? 1 : 0.5, transition: "all 0.2s",
                           }}
                         >
                           {day.label}
+                          {isRecommended && isOpen && !orderDay && <span style={{ display: "block", fontSize: "9px", marginTop: "2px", color: gold, fontWeight: "700", letterSpacing: "0.08em" }}>NEXT OPEN</span>}
                           {!isOpen && <span style={{ display: "block", fontSize: "10px", marginTop: "2px" }}>Closed</span>}
                         </button>
                       );
