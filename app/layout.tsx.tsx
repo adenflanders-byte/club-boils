@@ -1,6 +1,4 @@
-import type { Metadata } from "next";
-
-export const metadata: Metadata = {
+export const metadata = {
   title: "The Club Boils | Seafood Boils in Trinidad",
   description: "Order premium seafood boils, ramen and wings from The Club Boils in Arima, Trinidad. Open Thursday, Friday and Saturday for pickup and delivery.",
   metadataBase: new URL("https://www.theclubboils.com"),
@@ -24,7 +22,7 @@ export const metadata: Metadata = {
   keywords: ["seafood boil", "Trinidad", "Arima", "shrimp", "crab", "ramen", "wings", "delivery", "pickup"],
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <head>
