@@ -424,14 +424,15 @@ export default function AdminPage() {
     if (!order.notes) return null;
     const m = order.notes.match(/Day:\s*(Thursday|Friday|Saturday)/i);
     if (!m) return null;
-    // Use created_at week to derive the actual pickup date
-    const base = new Date(order.created_at);
+    // Parse created_at in TT timezone to avoid UTC date shifting
+    const baseTT = new Date(new Date(order.created_at).toLocaleString("en-US", { timeZone: "America/Port_of_Spain" }));
     const dayMap: Record<string, number> = { thursday: 4, friday: 5, saturday: 6 };
     const target = dayMap[m[1].toLowerCase()];
-    let diff = target - base.getDay();
-    if (diff <= 0) diff += 7;
-    const result = new Date(base);
-    result.setDate(base.getDate() + diff);
+    let diff = target - baseTT.getDay();
+    if (diff < 0) diff += 7; // day already passed this week — go to next week
+    // diff === 0: created on fulfilment day — valid, keep as-is
+    const result = new Date(baseTT);
+    result.setDate(baseTT.getDate() + diff);
     const yy = result.getFullYear();
     const mm = String(result.getMonth() + 1).padStart(2, "0");
     const dd = String(result.getDate()).padStart(2, "0");
@@ -537,18 +538,40 @@ export default function AdminPage() {
       <div style={{ maxWidth: "900px", margin: "0 auto", padding: "40px 24px" }}>
 
         {/* Stats */}
+        {(() => {
+          const now = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Port_of_Spain" }));
+          const dow = now.getDay();
+          const daysBack = dow === 0 ? 6 : dow - 1;
+          const wStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysBack, 0, 0, 0);
+          const wEnd   = new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysBack + 6, 23, 59, 59);
+          const thisWeekEarned = completedOrders.filter(o => {
+            const fd = getFulfilmentDate(o);
+            if (!fd) return false;
+            const d = new Date(fd + "T12:00:00-04:00");
+            return d >= wStart && d <= wEnd;
+          }).reduce((s, o) => s + o.total, 0);
+          const thisWeekExpected = orders.filter(o => ["new","confirmed","ready"].includes(o.status)).filter(o => {
+            const fd = getFulfilmentDate(o);
+            if (!fd) return false;
+            const d = new Date(fd + "T12:00:00-04:00");
+            return d >= wStart && d <= wEnd;
+          }).reduce((s, o) => s + o.total, 0);
+          return (
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px", marginBottom: "32px" }}>
           {[
-            { label: "Total Orders",   value: orders.length   },
-            { label: "Pending",        value: pendingCount    },
-            { label: "Week's Revenue", value: `TT$${totalRevenue}` },
+            { label: "Total Orders",      value: orders.length,                                           sub: "all statuses"           },
+            { label: "Pending",           value: pendingCount,                                            sub: "need action"             },
+            { label: "This Week Earned",  value: `TT$${thisWeekEarned}`, sub: thisWeekExpected > 0 ? `+ TT$${thisWeekExpected} expected` : "completed orders only" },
           ].map(stat => (
-            <div key={stat.label} style={{ backgroundColor: C.white, borderRadius: "4px", border: `1px solid ${C.border}`, padding: "20px 22px" }}>
+            <div key={stat.label} className="admin-card" style={{ backgroundColor: C.white, borderRadius: "6px", border: `1px solid ${C.border}`, padding: "20px 22px", animation: "fadeUp 0.5s ease both" }}>
               <p style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "0.1em", textTransform: "uppercase" as const, color: C.muted, marginBottom: "8px" }}>{stat.label}</p>
               <p style={{ fontFamily: FONT_DISPLAY, fontSize: "26px", color: C.black }}>{stat.value}</p>
+              <p style={{ fontSize: "11px", color: C.muted, marginTop: "4px" }}>{stat.sub}</p>
             </div>
           ))}
         </div>
+          );
+        })()}
 
         {/* ── STORE SETTINGS ── */}
         <div className="admin-card" style={{ backgroundColor: C.white, borderRadius: "6px", border: `1px solid ${C.border}`, padding: "24px", marginBottom: "24px", animation: "fadeUp 0.5s ease both" }}>
@@ -647,7 +670,6 @@ export default function AdminPage() {
                 <span style={{ fontSize: "13px", color: favItems[item.key] ? C.charcoal : C.muted, fontWeight: favItems[item.key] ? "500" : "400" }}>{item.label}</span>
               </div>
             ))}
-          </div>
 
           {/* Save button */}
           <button
@@ -1211,6 +1233,7 @@ export default function AdminPage() {
             })}
           </div>
         )}
+      </div>
       </div>
     </main>
     </>

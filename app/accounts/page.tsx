@@ -74,16 +74,22 @@ function getFulfilmentDate(order: Order): string | null {
   if (!order.notes) return null;
   const m = order.notes.match(/Day:\s*(Thursday|Friday|Saturday)/i);
   if (!m) return null;
-  // Use created_at week to find the right day
-  const base = new Date(order.created_at);
+  // Use created_at in TT timezone as the base
+  const base = toTT(new Date(order.created_at));
   const dayMap: Record<string, number> = { thursday: 4, friday: 5, saturday: 6 };
   const target = dayMap[m[1].toLowerCase()];
   const cur = base.getDay();
+  // Find the NEXT occurrence of the target day (including today if it matches)
+  // Orders are placed before the cutoff, so the fulfilment day is always >= order day
   let diff = target - cur;
-  if (diff <= 0) diff += 7;
+  if (diff < 0) diff += 7; // already passed this week, go to next
+  // diff === 0 means created on the same day as fulfilment — that's valid, keep it
   const result = new Date(base);
   result.setDate(base.getDate() + diff);
-  return result.toISOString().split("T")[0];
+  const yy = result.getFullYear();
+  const mm = String(result.getMonth() + 1).padStart(2, "0");
+  const dd = String(result.getDate()).padStart(2, "0");
+  return `${yy}-${mm}-${dd}`;
 }
 
 // ── Styling tokens ─────────────────────────────────────────────────────
