@@ -95,6 +95,19 @@ export default function AdminPage() {
         menuState[r.key] = r.value === "true";
       });
       if (Object.keys(menuState).length > 0) setMenuItems(prev => ({ ...prev, ...menuState }));
+      const favState: Record<string, boolean> = {};
+      data.filter(r => r.key.startsWith("fav_")).forEach(r => {
+        favState[r.key] = r.value === "true";
+      });
+      if (Object.keys(favState).length > 0) setFavItems(prev => ({ ...prev, ...favState }));
+      const thu = data.find(r => r.key === "day_thursday");
+      const fri = data.find(r => r.key === "day_friday");
+      const sat = data.find(r => r.key === "day_saturday");
+      setOpenDays({
+        thursday: thu ? thu.value === "true" : true,
+        friday:   fri ? fri.value === "true" : true,
+        saturday: sat ? sat.value === "true" : false,
+      });
     }
   }
 
