@@ -4,12 +4,20 @@ import { supabase } from "@/lib/supabaseClient";
 
 type Heat = "mild" | "medium" | "hot" | "";
 
+interface ExtraItem {
+  id: string;
+  label: string;
+  qty: number;
+  unitPrice: number;
+}
 interface CartItem {
   id: string;
   name: string;
   description: string;
   price: number;
   quantity: number;
+  extras?: ExtraItem[];
+  basePrice?: number;
 }
 
 const SEAFOOD = [
@@ -38,6 +46,20 @@ const DUO_EXTRAS = [
   { id: "corn",     emoji: "🌽", label: "Extra Corn",     desc: "2 portions",price: 10 },
   { id: "potatoes", emoji: "🥔", label: "Extra Potatoes", desc: "2 portions",price: 10 },
 ];
+// Extra add-ons available on regular boils (Solo/Duo)
+const ADDON_EXTRAS = [
+  { id: "extra_shrimp",  emoji: "🦐", label: "Extra Shrimp",            unitPrice: 25 },
+  { id: "extra_crab",    emoji: "🦀", label: "Extra Snow Crab",          unitPrice: 50 },
+  { id: "extra_butter",  emoji: "🧈", label: "Specialty Butter Sauce",   unitPrice: 10 },
+  { id: "extra_egg",     emoji: "🥚", label: "Extra Egg",                unitPrice: 5  },
+  { id: "extra_clams",   emoji: "🐚", label: "Extra Clams",              unitPrice: 10 },
+  { id: "extra_mussels", emoji: "🦪", label: "Extra Mussels",            unitPrice: 10 },
+  { id: "extra_sausage", emoji: "🌭", label: "Extra Sausage",            unitPrice: 10 },
+  { id: "extra_corn",    emoji: "🌽", label: "Extra Corn",               unitPrice: 5  },
+  { id: "extra_potato",  emoji: "🥔", label: "Extra Potatoes",           unitPrice: 5  },
+  { id: "pepper_sauce",  emoji: "🌶️", label: "Pepper Sauce",            unitPrice: 10 },
+];
+
 const HEATS = [
   { id: "mild",   label: "Mild",   emoji: "😊" },
   { id: "medium", label: "Medium", emoji: "🌶️" },
@@ -73,6 +95,41 @@ export default function Home() {
   const [submitting,  setSubmitting]  = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [showBuild,    setShowBuild]    = useState(false);
+
+  // Extras customizer state
+  const [customizerItem, setCustomizerItem] = useState<{id: string, name: string, desc: string, basePrice: number} | null>(null);
+  const [customizerExtras, setCustomizerExtras] = useState<Record<string, number>>({});
+
+  function openCustomizer(item: {id: string, name: string, desc: string, basePrice: number}) {
+    setCustomizerItem(item);
+    setCustomizerExtras({});
+  }
+  function closeCustomizer() { setCustomizerItem(null); setCustomizerExtras({}); }
+  function setExtraQty(id: string, qty: number) {
+    setCustomizerExtras(prev => ({ ...prev, [id]: Math.max(0, Math.min(10, qty)) }));
+  }
+  function customizerTotal() {
+    if (!customizerItem) return 0;
+    return customizerItem.basePrice + ADDON_EXTRAS.reduce((s, e) => s + (customizerExtras[e.id] || 0) * e.unitPrice, 0);
+  }
+  function addCustomizedToCart() {
+    if (!customizerItem) return;
+    const activeExtras: ExtraItem[] = ADDON_EXTRAS
+      .filter(e => (customizerExtras[e.id] || 0) > 0)
+      .map(e => ({ id: e.id, label: e.label, qty: customizerExtras[e.id], unitPrice: e.unitPrice }));
+    const extrasDesc = activeExtras.length > 0
+      ? " + " + activeExtras.map(e => `${e.qty}x ${e.label}`).join(", ")
+      : "";
+    addToCart({
+      id: `${customizerItem.id}-${Date.now()}`,
+      name: customizerItem.name,
+      description: customizerItem.desc + extrasDesc,
+      price: customizerTotal(),
+      basePrice: customizerItem.basePrice,
+      extras: activeExtras,
+    });
+    closeCustomizer();
+  }
   const [buildType,    setBuildType]    = useState<"solo" | "duo" | "">("");
   const [showDuoBuild, setShowDuoBuild] = useState(false);
   const [duoBuildSeafood, setDuoBuildSeafood] = useState<string[]>([]);
@@ -323,7 +380,7 @@ export default function Home() {
       package: cart.map(i => `${i.quantity}x ${i.name}`).join(", "),
       details, fulfillment,
       address: fulfillment === "delivery" ? address.trim() : null,
-      notes: (notes.trim() ? notes.trim() + "\n" : "") + "Payment: " + (paymentMethod === "bank" ? "Bank Transfer" : "Cash on Delivery") + "\nDay: " + orderDay.charAt(0).toUpperCase() + orderDay.slice(1), total: totalPrice, status: "new",
+      notes: (notes.trim() ? notes.trim() + "\n" : "") + "Payment: " + (paymentMethod === "bank" ? "online_payment" : "cash_on_delivery") + "\nDay: " + orderDay.charAt(0).toUpperCase() + orderDay.slice(1), total: totalPrice, status: "new",
     });
     setSubmitting(false);
     if (error) { setSubmitError("Something went wrong. Please call us at 868-293-0570."); }
@@ -706,7 +763,7 @@ export default function Home() {
                         <p style={{ fontSize: "12px", color: muted, marginBottom: "16px" }}>{opt.label} · Specialty butter sauce</p>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                           <p style={{ fontFamily: "'Cinzel', serif", fontSize: "20px", color: gold, fontWeight: "600" }}>TT${opt.price}</p>
-                          <button className="add-btn" onClick={() => ordersOpen && addToCart({ id: opt.id, name: "Club Solo", description: opt.label, price: opt.price })} style={{ ...addBtn, opacity: ordersOpen ? 1 : 0.4 }} disabled={!ordersOpen}>+ Add</button>
+                          <button className="add-btn" onClick={() => ordersOpen && openCustomizer({ id: opt.id, name: "Club Solo", desc: opt.label, basePrice: opt.price })} style={{ ...addBtn, opacity: ordersOpen ? 1 : 0.4 }} disabled={!ordersOpen}>+ Customize</button>
                         </div>
                       </div>
                     </div>
@@ -743,7 +800,7 @@ export default function Home() {
                         <p style={{ fontSize: "12px", color: muted, marginBottom: "16px" }}>{opt.label} · Specialty butter sauce</p>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                           <p style={{ fontFamily: "'Cinzel', serif", fontSize: "20px", color: gold, fontWeight: "600" }}>TT${opt.price}</p>
-                          <button className="add-btn" onClick={() => ordersOpen && addToCart({ id: opt.id, name: "Club Duo", description: opt.label, price: opt.price })} style={{ ...addBtn, opacity: ordersOpen ? 1 : 0.4 }} disabled={!ordersOpen}>+ Add</button>
+                          <button className="add-btn" onClick={() => ordersOpen && openCustomizer({ id: opt.id, name: "Club Duo", desc: opt.label, basePrice: opt.price })} style={{ ...addBtn, opacity: ordersOpen ? 1 : 0.4 }} disabled={!ordersOpen}>+ Customize</button>
                         </div>
                       </div>
                     </div>
@@ -930,6 +987,70 @@ export default function Home() {
                     </div>
                   </div>
                 </div>
+            )}
+
+            {/* ── EXTRAS CUSTOMIZER MODAL ── */}
+            {customizerItem && (
+              <div style={{ position: "fixed", inset: 0, zIndex: 500, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+                <div onClick={closeCustomizer} style={{ position: "absolute", inset: 0, backgroundColor: "rgba(0,0,0,0.6)" }} />
+                <div style={{ position: "relative", backgroundColor: white, borderRadius: "16px 16px 0 0", width: "100%", maxWidth: "540px", maxHeight: "90vh", overflowY: "auto" as const, padding: "32px 24px 40px", zIndex: 501 }}>
+                  {/* Header */}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "20px" }}>
+                    <div>
+                      <p style={{ fontFamily: "'Cinzel', serif", fontSize: "20px", color: black, fontWeight: "600" }}>{customizerItem.name}</p>
+                      <p style={{ fontSize: "13px", color: muted, marginTop: "4px" }}>{customizerItem.desc}</p>
+                    </div>
+                    <button onClick={closeCustomizer} style={{ background: "none", border: "none", fontSize: "24px", cursor: "pointer", color: muted, padding: "0 0 0 12px" }}>×</button>
+                  </div>
+
+                  {/* Base price */}
+                  <div style={{ backgroundColor: goldDim, border: `1px solid ${gold}`, borderRadius: "6px", padding: "12px 16px", marginBottom: "20px", display: "flex", justifyContent: "space-between" }}>
+                    <p style={{ fontSize: "13px", fontWeight: "600", color: charcoal }}>Base Price</p>
+                    <p style={{ fontFamily: "'Cinzel', serif", fontSize: "16px", color: gold }}>TT${customizerItem.basePrice}</p>
+                  </div>
+
+                  {/* Extras */}
+                  <p style={{ fontFamily: "'Inter', sans-serif", fontSize: "10px", fontWeight: "700", letterSpacing: "0.14em", textTransform: "uppercase" as const, color: muted, marginBottom: "12px" }}>Add Extras (Optional)</p>
+                  <div style={{ display: "grid", gap: "8px", marginBottom: "24px" }}>
+                    {ADDON_EXTRAS.map(extra => {
+                      const qty = customizerExtras[extra.id] || 0;
+                      return (
+                        <div key={extra.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", border: qty > 0 ? `1px solid ${gold}` : `1px solid ${border}`, borderRadius: "6px", backgroundColor: qty > 0 ? goldDim : "transparent", transition: "all 0.2s" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                            <span style={{ fontSize: "20px" }}>{extra.emoji}</span>
+                            <div>
+                              <p style={{ fontSize: "13px", fontWeight: "500", color: charcoal }}>{extra.label}</p>
+                              <p style={{ fontSize: "11px", color: muted }}>TT${extra.unitPrice} each</p>
+                            </div>
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                            {qty > 0 && <p style={{ fontSize: "12px", color: gold, fontWeight: "700", minWidth: "60px", textAlign: "right" as const }}>TT${qty * extra.unitPrice}</p>}
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                              <button onClick={() => setExtraQty(extra.id, qty - 1)} style={{ width: "28px", height: "28px", borderRadius: "50%", border: `1px solid ${border}`, backgroundColor: qty > 0 ? gold : "transparent", color: qty > 0 ? white : muted, fontSize: "16px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }}>−</button>
+                              <span style={{ fontSize: "14px", fontWeight: "700", color: charcoal, minWidth: "16px", textAlign: "center" as const }}>{qty}</span>
+                              <button onClick={() => setExtraQty(extra.id, qty + 1)} style={{ width: "28px", height: "28px", borderRadius: "50%", border: `1px solid ${gold}`, backgroundColor: gold, color: white, fontSize: "16px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }}>+</button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Running total + Add button */}
+                  <div style={{ backgroundColor: black, borderRadius: "8px", padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                    <div>
+                      <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.4)", letterSpacing: "0.1em", textTransform: "uppercase" as const, marginBottom: "4px" }}>Item Total</p>
+                      {ADDON_EXTRAS.filter(e => (customizerExtras[e.id] || 0) > 0).map(e => (
+                        <p key={e.id} style={{ fontSize: "11px", color: "rgba(255,255,255,0.5)" }}>{customizerExtras[e.id]}x {e.label} = TT${customizerExtras[e.id] * e.unitPrice}</p>
+                      ))}
+                    </div>
+                    <p style={{ fontFamily: "'Cinzel', serif", fontSize: "28px", color: gold }}>TT${customizerTotal()}</p>
+                  </div>
+                  <button onClick={addCustomizedToCart} style={{ ...goldBtn, width: "100%", padding: "16px", fontSize: "14px" }} className="gold-btn">
+                    Add to Order — TT${customizerTotal()}
+                  </button>
+                </div>
+              </div>
             )}
 
             {/* Sticky cart bar */}
