@@ -51,15 +51,22 @@ export default function AdminPage() {
   const [search,    setSearch]   = useState("");
 
   // Order editing
-  const [editingOrder, setEditingOrder] = useState<string | null>(null);
-  const [editName,     setEditName]     = useState("");
-  const [editPhone,    setEditPhone]    = useState("");
-  const [editEmail,    setEditEmail]    = useState("");
-  const [editAddress,  setEditAddress]  = useState("");
-  const [editNotes,    setEditNotes]    = useState("");
-  const [editTotal,    setEditTotal]    = useState("");
-  const [editFulfill,  setEditFulfill]  = useState<"delivery" | "pickup">("pickup");
-  const [editSaving,   setEditSaving]   = useState(false);
+  const [editingOrder,  setEditingOrder]  = useState<string | null>(null);
+  const [editName,      setEditName]      = useState("");
+  const [editPhone,     setEditPhone]     = useState("");
+  const [editEmail,     setEditEmail]     = useState("");
+  const [editAddress,   setEditAddress]   = useState("");
+  const [editArea,      setEditArea]      = useState("");
+  const [editNotes,     setEditNotes]     = useState("");
+  const [editTotal,     setEditTotal]     = useState("");
+  const [editFulfill,   setEditFulfill]   = useState<"delivery" | "pickup">("pickup");
+  const [editPayMethod, setEditPayMethod] = useState("");
+  const [editOrderDay,  setEditOrderDay]  = useState("");
+  const [editStatus,    setEditStatus]    = useState<OrderStatus>("new");
+  const [editSaving,    setEditSaving]    = useState(false);
+  const [editSaved,     setEditSaved]     = useState(false);
+  const [showEditConfirm, setShowEditConfirm] = useState(false);
+  const [editBefore,    setEditBefore]    = useState<Partial<Order> | null>(null);
 
   // Quick expenditure
   const [quickExpDesc,   setQuickExpDesc]   = useState("");
@@ -319,6 +326,7 @@ export default function AdminPage() {
 
   function startEdit(order: Order) {
     setEditingOrder(order.id);
+    setEditBefore({ ...order });
     setEditName(order.name);
     setEditPhone(order.phone);
     setEditEmail(order.email || "");
@@ -326,31 +334,56 @@ export default function AdminPage() {
     setEditNotes(order.notes || "");
     setEditTotal(String(order.total));
     setEditFulfill(order.fulfillment);
+    setEditStatus(order.status);
+    // Extract payment method from notes
+    const pm = (order.notes || "").includes("online_payment") || (order.notes || "").includes("Bank Transfer") ? "online_payment" : "cash_on_delivery";
+    setEditPayMethod(pm);
+    // Extract order day from notes
+    const dm = (order.notes || "").match(/Day:\s*(\w+)/);
+    setEditOrderDay(dm ? dm[1] : "");
+    // Extract delivery area
+    const am = (order.notes || "").match(/Area:\s*([^\n]+)/);
+    setEditArea(am ? am[1].trim() : "");
+    setShowEditConfirm(false);
+    setEditSaved(false);
   }
 
   async function saveEdit(id: string) {
     setEditSaving(true);
+    // Rebuild notes preserving structure
+    const noteParts = [];
+    if (editPayMethod) noteParts.push(`Payment: ${editPayMethod}`);
+    if (editOrderDay)  noteParts.push(`Day: ${editOrderDay}`);
+    if (editArea && editFulfill === "delivery") noteParts.push(`Area: ${editArea}`);
+    if (editNotes.trim()) noteParts.push(editNotes.trim());
+    const newNotes = noteParts.join("\n") || null;
+
     await supabase.from("orders").update({
       name:        editName.trim(),
       phone:       editPhone.trim(),
       email:       editEmail.trim() || null,
-      address:     editAddress.trim() || null,
-      notes:       editNotes.trim() || null,
+      address:     editFulfill === "delivery" ? editAddress.trim() : null,
+      notes:       newNotes,
       total:       Number(editTotal),
       fulfillment: editFulfill,
+      status:      editStatus,
     }).eq("id", id);
     setOrders(prev => prev.map(o => o.id === id ? {
       ...o,
       name:        editName.trim(),
       phone:       editPhone.trim(),
       email:       editEmail.trim() || null,
-      address:     editAddress.trim() || null,
-      notes:       editNotes.trim() || null,
+      address:     editFulfill === "delivery" ? editAddress.trim() : null,
+      notes:       newNotes,
       total:       Number(editTotal),
       fulfillment: editFulfill,
+      status:      editStatus,
     } : o));
     setEditSaving(false);
-    setEditingOrder(null);
+    setEditSaved(true);
+    setShowEditConfirm(false);
+    setEditBefore(null);
+    setTimeout(() => { setEditingOrder(null); setEditSaved(false); }, 1500);
   }
 
   async function addQuickExpenditure() {
@@ -655,7 +688,6 @@ export default function AdminPage() {
                 <p style={{ fontSize: "11px", marginTop: "4px", color: openDays[day.key] ? "#1A7A3A" : C.muted }}>{openDays[day.key] ? "✅ Open" : "🔒 Closed"}</p>
               </div>
             ))}
-          </div>
 
           {/* Fan Favourites */}
           <p style={{ fontFamily: FONT_BODY, fontSize: "12px", fontWeight: "700", letterSpacing: "0.08em", textTransform: "uppercase" as const, color: C.muted, marginBottom: "12px", marginTop: "20px" }}>Fan Favourites</p>
@@ -1185,48 +1217,114 @@ export default function AdminPage() {
 
                       {/* Edit form */}
                       {editingOrder === order.id && (
-                        <div style={{ marginTop: "20px", padding: "20px", backgroundColor: C.cream, borderRadius: "4px", border: `1px solid ${C.border}` }}>
-                          <p style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "0.1em", textTransform: "uppercase" as const, color: C.gold, marginBottom: "16px" }}>Edit Order</p>
-                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "12px" }}>
-                            <div>
-                              <label style={{ fontSize: "11px", fontWeight: "700", color: C.muted, display: "block", marginBottom: "4px", textTransform: "uppercase" as const, letterSpacing: "0.08em" }}>Name</label>
-                              <input value={editName} onChange={e => setEditName(e.target.value)} style={{ width: "100%", padding: "9px 12px", borderRadius: "4px", border: `1px solid ${C.border}`, fontSize: "13px", fontFamily: FONT_BODY, boxSizing: "border-box" as const }} />
-                            </div>
-                            <div>
-                              <label style={{ fontSize: "11px", fontWeight: "700", color: C.muted, display: "block", marginBottom: "4px", textTransform: "uppercase" as const, letterSpacing: "0.08em" }}>Phone</label>
-                              <input value={editPhone} onChange={e => setEditPhone(e.target.value)} style={{ width: "100%", padding: "9px 12px", borderRadius: "4px", border: `1px solid ${C.border}`, fontSize: "13px", fontFamily: FONT_BODY, boxSizing: "border-box" as const }} />
-                            </div>
-                            <div>
-                              <label style={{ fontSize: "11px", fontWeight: "700", color: C.muted, display: "block", marginBottom: "4px", textTransform: "uppercase" as const, letterSpacing: "0.08em" }}>Email</label>
-                              <input value={editEmail} onChange={e => setEditEmail(e.target.value)} style={{ width: "100%", padding: "9px 12px", borderRadius: "4px", border: `1px solid ${C.border}`, fontSize: "13px", fontFamily: FONT_BODY, boxSizing: "border-box" as const }} />
-                            </div>
-                            <div>
-                              <label style={{ fontSize: "11px", fontWeight: "700", color: C.muted, display: "block", marginBottom: "4px", textTransform: "uppercase" as const, letterSpacing: "0.08em" }}>Total (TT$)</label>
-                              <input type="number" value={editTotal} onChange={e => setEditTotal(e.target.value)} style={{ width: "100%", padding: "9px 12px", borderRadius: "4px", border: `1px solid ${C.border}`, fontSize: "13px", fontFamily: FONT_BODY, boxSizing: "border-box" as const }} />
-                            </div>
+                        <div style={{ marginTop: "20px", padding: "20px", backgroundColor: C.cream, borderRadius: "6px", border: `1px solid ${C.gold}` }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+                            <p style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "0.1em", textTransform: "uppercase" as const, color: C.gold }}>Edit Order</p>
+                            {editSaved && <p style={{ fontSize: "12px", color: "#1A7A3A", fontWeight: "700" }}>✅ Saved!</p>}
                           </div>
-                          <div style={{ marginBottom: "12px" }}>
-                            <label style={{ fontSize: "11px", fontWeight: "700", color: C.muted, display: "block", marginBottom: "4px", textTransform: "uppercase" as const, letterSpacing: "0.08em" }}>Fulfillment</label>
-                            <div style={{ display: "flex", gap: "8px" }}>
-                              <button onClick={() => setEditFulfill("pickup")} style={{ flex: 1, padding: "9px", borderRadius: "4px", border: editFulfill === "pickup" ? `2px solid ${C.gold}` : `1px solid ${C.border}`, backgroundColor: editFulfill === "pickup" ? "#F5EDD8" : C.white, cursor: "pointer", fontFamily: FONT_BODY, fontSize: "13px", fontWeight: editFulfill === "pickup" ? "700" : "400" }}>🏠 Pickup</button>
-                              <button onClick={() => setEditFulfill("delivery")} style={{ flex: 1, padding: "9px", borderRadius: "4px", border: editFulfill === "delivery" ? `2px solid ${C.gold}` : `1px solid ${C.border}`, backgroundColor: editFulfill === "delivery" ? "#F5EDD8" : C.white, cursor: "pointer", fontFamily: FONT_BODY, fontSize: "13px", fontWeight: editFulfill === "delivery" ? "700" : "400" }}>🚗 Delivery</button>
-                            </div>
-                          </div>
-                          {editFulfill === "delivery" && (
-                            <div style={{ marginBottom: "12px" }}>
-                              <label style={{ fontSize: "11px", fontWeight: "700", color: C.muted, display: "block", marginBottom: "4px", textTransform: "uppercase" as const, letterSpacing: "0.08em" }}>Delivery Address</label>
-                              <input value={editAddress} onChange={e => setEditAddress(e.target.value)} style={{ width: "100%", padding: "9px 12px", borderRadius: "4px", border: `1px solid ${C.border}`, fontSize: "13px", fontFamily: FONT_BODY, boxSizing: "border-box" as const }} />
+
+                          {/* Before/After preview */}
+                          {showEditConfirm && editBefore && (
+                            <div style={{ backgroundColor: C.white, border: `1px solid ${C.border}`, borderRadius: "4px", padding: "14px 16px", marginBottom: "16px", fontSize: "12px" }}>
+                              <p style={{ fontWeight: "700", color: C.charcoal, marginBottom: "8px" }}>Confirm Changes:</p>
+                              {editBefore.name !== editName && <p style={{ color: C.muted }}>Name: <s>{editBefore.name}</s> → <strong>{editName}</strong></p>}
+                              {editBefore.phone !== editPhone && <p style={{ color: C.muted }}>Phone: <s>{editBefore.phone}</s> → <strong>{editPhone}</strong></p>}
+                              {String(editBefore.total) !== editTotal && <p style={{ color: C.muted }}>Total: <s>TT${editBefore.total}</s> → <strong style={{ color: C.gold }}>TT${editTotal}</strong></p>}
+                              {editBefore.fulfillment !== editFulfill && <p style={{ color: C.muted }}>Fulfillment: <s>{editBefore.fulfillment}</s> → <strong>{editFulfill}</strong></p>}
+                              {editBefore.status !== editStatus && <p style={{ color: C.muted }}>Status: <s>{editBefore.status}</s> → <strong>{editStatus}</strong></p>}
                             </div>
                           )}
-                          <div style={{ marginBottom: "16px" }}>
-                            <label style={{ fontSize: "11px", fontWeight: "700", color: C.muted, display: "block", marginBottom: "4px", textTransform: "uppercase" as const, letterSpacing: "0.08em" }}>Notes</label>
-                            <textarea value={editNotes} onChange={e => setEditNotes(e.target.value)} rows={2} style={{ width: "100%", padding: "9px 12px", borderRadius: "4px", border: `1px solid ${C.border}`, fontSize: "13px", fontFamily: FONT_BODY, boxSizing: "border-box" as const, resize: "vertical" }} />
+
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "10px" }}>
+                            {[
+                              { label: "Name", value: editName, onChange: setEditName },
+                              { label: "Phone", value: editPhone, onChange: setEditPhone },
+                              { label: "Email", value: editEmail, onChange: setEditEmail },
+                              { label: "Total (TT$)", value: editTotal, onChange: setEditTotal, type: "number" },
+                            ].map(f => (
+                              <div key={f.label}>
+                                <label style={{ fontSize: "10px", fontWeight: "700", color: C.muted, display: "block", marginBottom: "4px", textTransform: "uppercase" as const, letterSpacing: "0.08em" }}>{f.label}</label>
+                                <input type={f.type || "text"} value={f.value} onChange={e => f.onChange(e.target.value)} style={{ width: "100%", padding: "8px 10px", borderRadius: "4px", border: `1px solid ${C.border}`, fontSize: "13px", fontFamily: FONT_BODY, boxSizing: "border-box" as const }} />
+                              </div>
+                            ))}
                           </div>
-                          <div style={{ display: "flex", gap: "10px" }}>
-                            <button onClick={() => saveEdit(order.id)} disabled={editSaving} style={{ backgroundColor: C.gold, color: C.white, padding: "10px 24px", borderRadius: "4px", border: "none", fontFamily: FONT_BODY, fontWeight: "600", fontSize: "13px", cursor: "pointer", opacity: editSaving ? 0.7 : 1 }}>
-                              {editSaving ? "Saving..." : "Save Changes"}
-                            </button>
-                            <button onClick={() => setEditingOrder(null)} style={{ backgroundColor: C.white, color: C.muted, padding: "10px 20px", borderRadius: "4px", border: `1px solid ${C.border}`, fontFamily: FONT_BODY, fontSize: "13px", cursor: "pointer" }}>
+
+                          {/* Order Day */}
+                          <div style={{ marginBottom: "10px" }}>
+                            <label style={{ fontSize: "10px", fontWeight: "700", color: C.muted, display: "block", marginBottom: "6px", textTransform: "uppercase" as const, letterSpacing: "0.08em" }}>Order Day</label>
+                            <div style={{ display: "flex", gap: "6px" }}>
+                              {["Thursday","Friday","Saturday"].map(d => (
+                                <button key={d} onClick={() => setEditOrderDay(d)} style={{ flex: 1, padding: "8px 4px", borderRadius: "4px", border: editOrderDay === d ? `2px solid ${C.gold}` : `1px solid ${C.border}`, backgroundColor: editOrderDay === d ? C.goldDim : C.white, cursor: "pointer", fontFamily: FONT_BODY, fontSize: "12px", fontWeight: editOrderDay === d ? "700" : "400", color: editOrderDay === d ? C.gold : C.muted }}>{d}</button>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Status */}
+                          <div style={{ marginBottom: "10px" }}>
+                            <label style={{ fontSize: "10px", fontWeight: "700", color: C.muted, display: "block", marginBottom: "6px", textTransform: "uppercase" as const, letterSpacing: "0.08em" }}>Status</label>
+                            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" as const }}>
+                              {(["new","confirmed","ready","completed","cancelled"] as OrderStatus[]).map(s => (
+                                <button key={s} onClick={() => setEditStatus(s)} style={{ padding: "7px 12px", borderRadius: "4px", border: editStatus === s ? `2px solid ${STATUS_CONFIG[s].color}` : `1px solid ${C.border}`, backgroundColor: editStatus === s ? STATUS_CONFIG[s].bg : C.white, cursor: "pointer", fontFamily: FONT_BODY, fontSize: "11px", fontWeight: editStatus === s ? "700" : "400", color: editStatus === s ? STATUS_CONFIG[s].color : C.muted, textTransform: "capitalize" as const }}>{s}</button>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Payment Method */}
+                          <div style={{ marginBottom: "10px" }}>
+                            <label style={{ fontSize: "10px", fontWeight: "700", color: C.muted, display: "block", marginBottom: "6px", textTransform: "uppercase" as const, letterSpacing: "0.08em" }}>Payment Method</label>
+                            <div style={{ display: "flex", gap: "6px" }}>
+                              {[["cash_on_delivery","💵 Cash on Delivery"],["online_payment","🏦 Online/Bank Transfer"]].map(([val, lbl]) => (
+                                <button key={val} onClick={() => setEditPayMethod(val)} style={{ flex: 1, padding: "8px", borderRadius: "4px", border: editPayMethod === val ? `2px solid ${C.gold}` : `1px solid ${C.border}`, backgroundColor: editPayMethod === val ? C.goldDim : C.white, cursor: "pointer", fontFamily: FONT_BODY, fontSize: "12px", fontWeight: editPayMethod === val ? "700" : "400", color: editPayMethod === val ? C.gold : C.muted }}>{lbl}</button>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Fulfillment */}
+                          <div style={{ marginBottom: "10px" }}>
+                            <label style={{ fontSize: "10px", fontWeight: "700", color: C.muted, display: "block", marginBottom: "6px", textTransform: "uppercase" as const, letterSpacing: "0.08em" }}>Fulfillment</label>
+                            <div style={{ display: "flex", gap: "6px" }}>
+                              <button onClick={() => setEditFulfill("pickup")} style={{ flex: 1, padding: "8px", borderRadius: "4px", border: editFulfill === "pickup" ? `2px solid ${C.gold}` : `1px solid ${C.border}`, backgroundColor: editFulfill === "pickup" ? C.goldDim : C.white, cursor: "pointer", fontFamily: FONT_BODY, fontSize: "12px", fontWeight: editFulfill === "pickup" ? "700" : "400", color: editFulfill === "pickup" ? C.gold : C.muted }}>🏠 Pickup</button>
+                              <button onClick={() => setEditFulfill("delivery")} style={{ flex: 1, padding: "8px", borderRadius: "4px", border: editFulfill === "delivery" ? `2px solid ${C.gold}` : `1px solid ${C.border}`, backgroundColor: editFulfill === "delivery" ? C.goldDim : C.white, cursor: "pointer", fontFamily: FONT_BODY, fontSize: "12px", fontWeight: editFulfill === "delivery" ? "700" : "400", color: editFulfill === "delivery" ? C.gold : C.muted }}>🚗 Delivery</button>
+                            </div>
+                          </div>
+
+                          {editFulfill === "delivery" && (
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "10px" }}>
+                              <div>
+                                <label style={{ fontSize: "10px", fontWeight: "700", color: C.muted, display: "block", marginBottom: "4px", textTransform: "uppercase" as const, letterSpacing: "0.08em" }}>Delivery Area</label>
+                                <select value={editArea} onChange={e => setEditArea(e.target.value)} style={{ width: "100%", padding: "8px 10px", borderRadius: "4px", border: `1px solid ${C.border}`, fontSize: "13px", fontFamily: FONT_BODY }}>
+                                  <option value="">Select area...</option>
+                                  {["Arima","D'Abadie","Sangre Grande","Cumuto","Valencia","Other"].map(a => <option key={a} value={a}>{a}</option>)}
+                                </select>
+                              </div>
+                              <div>
+                                <label style={{ fontSize: "10px", fontWeight: "700", color: C.muted, display: "block", marginBottom: "4px", textTransform: "uppercase" as const, letterSpacing: "0.08em" }}>Full Address</label>
+                                <input value={editAddress} onChange={e => setEditAddress(e.target.value)} style={{ width: "100%", padding: "8px 10px", borderRadius: "4px", border: `1px solid ${C.border}`, fontSize: "13px", fontFamily: FONT_BODY, boxSizing: "border-box" as const }} />
+                              </div>
+                            </div>
+                          )}
+
+                          <div style={{ marginBottom: "14px" }}>
+                            <label style={{ fontSize: "10px", fontWeight: "700", color: C.muted, display: "block", marginBottom: "4px", textTransform: "uppercase" as const, letterSpacing: "0.08em" }}>Additional Notes</label>
+                            <textarea value={editNotes} onChange={e => setEditNotes(e.target.value)} rows={2} placeholder="Allergies, special instructions..." style={{ width: "100%", padding: "8px 10px", borderRadius: "4px", border: `1px solid ${C.border}`, fontSize: "13px", fontFamily: FONT_BODY, boxSizing: "border-box" as const, resize: "vertical" }} />
+                          </div>
+
+                          <div style={{ display: "flex", gap: "8px" }}>
+                            {!showEditConfirm ? (
+                              <button onClick={() => setShowEditConfirm(true)} style={{ background: `linear-gradient(135deg, ${C.gold}, #E8B84B)`, color: C.black, padding: "10px 24px", borderRadius: "4px", border: "none", fontFamily: FONT_BODY, fontWeight: "700", fontSize: "12px", letterSpacing: "0.08em", cursor: "pointer", textTransform: "uppercase" as const }}>
+                                Review Changes
+                              </button>
+                            ) : (
+                              <button onClick={() => saveEdit(order.id)} disabled={editSaving} style={{ background: `linear-gradient(135deg, ${C.gold}, #E8B84B)`, color: C.black, padding: "10px 24px", borderRadius: "4px", border: "none", fontFamily: FONT_BODY, fontWeight: "700", fontSize: "12px", letterSpacing: "0.08em", cursor: "pointer", textTransform: "uppercase" as const, opacity: editSaving ? 0.7 : 1 }}>
+                                {editSaving ? "Saving..." : "✅ Confirm Save"}
+                              </button>
+                            )}
+                            {showEditConfirm && (
+                              <button onClick={() => setShowEditConfirm(false)} style={{ backgroundColor: C.white, color: C.muted, padding: "10px 16px", borderRadius: "4px", border: `1px solid ${C.border}`, fontFamily: FONT_BODY, fontSize: "12px", cursor: "pointer" }}>
+                                Keep Editing
+                              </button>
+                            )}
+                            <button onClick={() => { setEditingOrder(null); setShowEditConfirm(false); }} style={{ backgroundColor: C.white, color: C.muted, padding: "10px 16px", borderRadius: "4px", border: `1px solid ${C.border}`, fontFamily: FONT_BODY, fontSize: "12px", cursor: "pointer" }}>
                               Cancel
                             </button>
                           </div>
@@ -1237,17 +1335,8 @@ export default function AdminPage() {
                 </div>
               );
             })}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })}
           </div>
         )}
-      </div>
-      </div>
     </main>
     </>
   );

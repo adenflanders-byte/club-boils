@@ -139,7 +139,8 @@ export default function Home() {
   const [buildExtras,  setBuildExtras]  = useState<string[]>([]);
   const [buildHeat,    setBuildHeat]    = useState<Heat>("");
   const [fulfillment, setFulfillment] = useState<"delivery" | "pickup" | "">("");
-  const [paymentMethod, setPaymentMethod] = useState<"bank" | "cash" | "">("");
+  const [paymentMethod,  setPaymentMethod]  = useState<"bank" | "cash" | "">("");
+  const [deliveryArea,   setDeliveryArea]   = useState("");
   const [orderDay, setOrderDay] = useState<"thursday" | "friday" | "saturday" | "">("");
   const [openDays, setOpenDays] = useState({ thursday: true, friday: true, saturday: false });
   const [name,    setName]    = useState("");
@@ -380,7 +381,7 @@ export default function Home() {
       package: cart.map(i => `${i.quantity}x ${i.name}`).join(", "),
       details, fulfillment,
       address: fulfillment === "delivery" ? address.trim() : null,
-      notes: (notes.trim() ? notes.trim() + "\n" : "") + "Payment: " + (paymentMethod === "bank" ? "online_payment" : "cash_on_delivery") + "\nDay: " + orderDay.charAt(0).toUpperCase() + orderDay.slice(1), total: totalPrice, status: "new",
+      notes: (notes.trim() ? notes.trim() + "\n" : "") + "Payment: " + (paymentMethod === "bank" ? "online_payment" : "cash_on_delivery") + "\nDay: " + orderDay.charAt(0).toUpperCase() + orderDay.slice(1) + (deliveryArea ? "\nArea: " + deliveryArea : ""), total: totalPrice, status: "new",
     });
     setSubmitting(false);
     if (error) { setSubmitError("Something went wrong. Please call us at 868-293-0570."); }
@@ -1104,6 +1105,17 @@ export default function Home() {
                   </div>
                 </div>
                 {fulfillment === "delivery" && (
+                <div>
+                  <label style={labelStyle}>Delivery Area *</label>
+                  <select value={deliveryArea} onChange={e => setDeliveryArea(e.target.value)} style={{ width: "100%", padding: "12px 14px", borderRadius: "2px", border: `1px solid ${border}`, fontSize: "14px", fontFamily: "'Inter', sans-serif", boxSizing: "border-box" as const, backgroundColor: white, color: charcoal }}>
+                    <option value="">Select your area...</option>
+                    {["Arima","D'Abadie","Sangre Grande","Cumuto","Valencia","Malabar","Piarco","Other (East Trinidad)"].map(a => (
+                      <option key={a} value={a}>{a}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              {fulfillment === "delivery" && (
                   <div style={{ backgroundColor: "rgba(196,149,42,0.08)", border: `1px solid ${border}`, borderRadius: "2px", padding: "14px 16px", fontSize: "13px", color: muted, lineHeight: 1.6 }}>
                     ⚠️ Delivery is available to select areas in East Trinidad for TT$30. We'll confirm availability for your address after your order is placed.
                   </div>
