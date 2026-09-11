@@ -141,6 +141,11 @@ export default function Home() {
   const [fulfillment, setFulfillment] = useState<"delivery" | "pickup" | "">("");
   const [paymentMethod,  setPaymentMethod]  = useState<"bank" | "cash" | "">("");
   const [deliveryArea,   setDeliveryArea]   = useState("");
+
+  // Approved East Trinidad delivery areas
+  const EAST_AREAS = ["Arima","D'Abadie","Sangre Grande","Cumuto","Valencia","Malabar","Piarco","Trincity","Arouca","El Dorado","Tacarigua","Carapo"];
+  const REVIEW_AREAS = ["Other East area — request confirmation"];
+  const BLOCKED_AREAS = ["Port of Spain","San Fernando","Chaguanas","Marabella","Point Fortin","Siparia","Penal","Debe","Couva","Fyzabad","Princes Town","Rio Claro","Mayaro","Tobago"];
   const [orderDay, setOrderDay] = useState<"thursday" | "friday" | "saturday" | "">("");
   const [openDays, setOpenDays] = useState({ thursday: true, friday: true, saturday: false });
   const [name,    setName]    = useState("");
@@ -1106,13 +1111,26 @@ export default function Home() {
                 </div>
                 {fulfillment === "delivery" && (
                 <div>
+                  {/* East-only delivery notice */}
+                  <div style={{ backgroundColor: "#FFF8EC", border: "1px solid #F0C04A", borderRadius: "4px", padding: "12px 16px", marginBottom: "12px" }}>
+                    <p style={{ fontSize: "11px", fontWeight: "700", color: "#B8600A", letterSpacing: "0.08em", textTransform: "uppercase" as const, marginBottom: "4px" }}>⚠️ Delivery Notice</p>
+                    <p style={{ fontSize: "12px", color: "#B8600A", lineHeight: 1.6 }}>Delivery is currently available to East Trinidad only. If your area is outside the East, please select Pickup in Arima. If you are unsure, <a href="https://wa.me/18682930570" target="_blank" rel="noopener noreferrer" style={{ color: "#B8600A", fontWeight: "700" }}>contact us</a> before placing your order.</p>
+                  </div>
                   <label style={labelStyle}>Delivery Area *</label>
                   <select value={deliveryArea} onChange={e => setDeliveryArea(e.target.value)} style={{ width: "100%", padding: "12px 14px", borderRadius: "2px", border: `1px solid ${border}`, fontSize: "14px", fontFamily: "'Inter', sans-serif", boxSizing: "border-box" as const, backgroundColor: white, color: charcoal }}>
                     <option value="">Select your area...</option>
-                    {["Arima","D'Abadie","Sangre Grande","Cumuto","Valencia","Malabar","Piarco","Other (East Trinidad)"].map(a => (
-                      <option key={a} value={a}>{a}</option>
-                    ))}
+                    <optgroup label="East Trinidad (Delivery Available)">
+                      {EAST_AREAS.map(a => <option key={a} value={a}>{a}</option>)}
+                    </optgroup>
+                    <optgroup label="Need Confirmation">
+                      {REVIEW_AREAS.map(a => <option key={a} value={a}>{a}</option>)}
+                    </optgroup>
                   </select>
+                  {deliveryArea === "Other East area — request confirmation" && (
+                    <div style={{ backgroundColor: "#EBF3FF", border: "1px solid #B8D4F5", borderRadius: "4px", padding: "10px 14px", marginTop: "8px" }}>
+                      <p style={{ fontSize: "12px", color: "#1A56A4" }}>📞 Your order will be placed but delivery needs confirmation. We'll contact you at the number provided.</p>
+                    </div>
+                  )}
                 </div>
               )}
               {fulfillment === "delivery" && (

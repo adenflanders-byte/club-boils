@@ -37,6 +37,12 @@ interface Order {
   fulfillment: string;
   notes?: string | null;
   payment_method?: string | null;
+  scheduled_fulfilment_date?: string | null;
+  payment_status?: string | null;
+  amount_paid?: number | null;
+  paid_at?: string | null;
+  delivery_area?: string | null;
+  delivery_fee?: number | null;
 }
 
 // ── Constants ──────────────────────────────────────────────────────────
