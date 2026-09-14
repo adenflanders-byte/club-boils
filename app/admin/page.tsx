@@ -876,7 +876,7 @@ export default function AdminPage() {
                                                 <label style={{ fontSize: "10px", fontWeight: "700", color: C.muted, display: "block", marginBottom: "4px", textTransform: "uppercase" as const, letterSpacing: "0.08em" }}>Area</label>
                                                 <select value={editArea} onChange={e => setEditArea(e.target.value)} style={{ ...inputStyle }}>
                                                   <option value="">Select...</option>
-                                                  {["Arima","D'Abadie","Sangre Grande","Cumuto","Valencia","Malabar","Piarco","Other"].map(a => <option key={a} value={a}>{a}</option>)}
+                                                  {["Arima","D'Abadie","Grand Bazaar","Sangre Grande","Cumuto","Valencia","Malabar","Piarco","Other"].map(a => <option key={a} value={a}>{a}</option>)}
                                                 </select>
                                               </div>
                                               <div>

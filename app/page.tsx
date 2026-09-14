@@ -143,7 +143,7 @@ export default function Home() {
   const [deliveryArea,   setDeliveryArea]   = useState("");
 
   // Approved East Trinidad delivery areas
-  const EAST_AREAS = ["Arima","D'Abadie","Sangre Grande","Cumuto","Valencia","Malabar","Piarco","Trincity","Arouca","El Dorado","Tacarigua","Carapo"];
+  const EAST_AREAS = ["Arima","D'Abadie","Grand Bazaar","Sangre Grande","Cumuto","Valencia","Malabar","Piarco","Trincity","Arouca","El Dorado","Tacarigua","Carapo"];
   const REVIEW_AREAS = ["Other East area — request confirmation"];
   const BLOCKED_AREAS = ["Port of Spain","San Fernando","Chaguanas","Marabella","Point Fortin","Siparia","Penal","Debe","Couva","Fyzabad","Princes Town","Rio Claro","Mayaro","Tobago"];
   const [orderDay, setOrderDay] = useState<"thursday" | "friday" | "saturday" | "">("");
