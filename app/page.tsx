@@ -877,9 +877,12 @@ export default function Home() {
                   <p style={{ fontSize: "12px", color: muted, letterSpacing: "0.06em" }}>Premium whole lobster · House Butter Sauce</p>
                 </div>
 
-                {/* Banner image */}
+                {/* Banner video */}
                 <div style={{ position: "relative", height: "220px", borderRadius: "4px", overflow: "hidden", marginBottom: "32px" }}>
-                  <img src="/lobster-intro.jpeg" alt="Lobster Boils" style={{ width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }} />
+                  <video autoPlay muted loop playsInline style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }}>
+                    <source src="/Lobster-vid1.mp4" type="video/mp4" />
+                    <source src="/lobster-vid2.mov" type="video/quicktime" />
+                  </video>
                   <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to right, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.2) 60%, transparent 100%)", pointerEvents: "none" }} />
                   <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column" as const, justifyContent: "center", padding: "40px" }}>
                     <p style={{ fontSize: "10px", fontWeight: "700", letterSpacing: "0.2em", textTransform: "uppercase" as const, color: gold, marginBottom: "10px" }}>Limited · Premium Selection</p>
@@ -903,7 +906,7 @@ export default function Home() {
                       <div key={product.id} className="menu-card"
                         style={{ borderRadius: "4px", overflow: "hidden", backgroundColor: white, border: `1px solid ${border}`, transition: "box-shadow 0.3s ease" }}>
                         <div style={{ position: "relative", height: "200px", overflow: "hidden", backgroundColor: "#1a1a1a" }}>
-                          <img src="/lobster-intro.jpeg" alt={product.name} style={{ width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }} />
+                          <img src="/lobster-hero.jpeg" alt={product.name} style={{ width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }} />
                           <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.75) 0%, transparent 50%)", pointerEvents: "none" }} />
                           {favItems[`fav_${product.id}`] && (
                             <div style={{ position: "absolute", top: "12px", right: "12px", backgroundColor: "#FFD700", padding: "4px 10px", borderRadius: "1px" }}>
@@ -1514,7 +1517,6 @@ export default function Home() {
                 <strong style={{ color: gold }}>Delivery available</strong> to select areas in the East. A TT$30 fee applies. Contact us to confirm your area before placing your order.
               </p>
             </div>
-          </div>
         </section>
 
         {/* FOOTER */}
