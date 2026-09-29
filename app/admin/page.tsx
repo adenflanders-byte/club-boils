@@ -76,11 +76,15 @@ export default function AdminPage() {
     menu_solo_shrimp: true, menu_solo_crab: true, menu_solo_mix: true,
     menu_duo_shrimp: true,  menu_duo_crab: true,  menu_duo_mix: true,
     menu_ramen: true, menu_wings: true, menu_sauce: true, menu_build: true, menu_combo: true,
+    menu_lobster_half: true, menu_lobster_whole: true, menu_lobster_shrimp_half: true,
+    menu_lobster_shrimp_whole: true, menu_lobster_loaded_half: true, menu_lobster_loaded_whole: true,
   });
   const [favItems,       setFavItems]       = useState<Record<string, boolean>>({
     fav_solo_shrimp: false, fav_solo_crab: false, fav_solo_mix: false,
     fav_duo_shrimp: false,  fav_duo_crab: false,  fav_duo_mix: false,
     fav_ramen: false, fav_wings: false, fav_sauce: false, fav_build: false, fav_combo: false,
+    fav_lobster_half: false, fav_lobster_whole: false, fav_lobster_shrimp_half: false,
+    fav_lobster_shrimp_whole: false, fav_lobster_loaded_half: false, fav_lobster_loaded_whole: false,
   });
   const [openDays,       setOpenDays]       = useState({ thursday: true, friday: true, saturday: false });
   const [settingsLoading,setSettingsLoading]= useState(false);
@@ -89,17 +93,40 @@ export default function AdminPage() {
   // Reviews
   const [pendingReviews, setPendingReviews] = useState<{id: string, name: string, rating: number, comment: string, created_at: string}[]>([]);
 
-  // Revenue history
-  const [revenueHistory, setRevenueHistory] = useState<{week: string, revenue: number, orders: number}[]>([]);
   const [markingComplete,setMarkingComplete]= useState(false);
+  const [collapsedWeeks, setCollapsedWeeks] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    if (authed) { fetchOrders(); fetchSettings(); fetchReviews(); loadRevenueHistory(); }
+    if (authed) { fetchOrders(); fetchSettings(); fetchReviews(); }
   }, [authed]);
 
-  function loadRevenueHistory() {
-    const saved = localStorage.getItem("revenue_history");
-    if (saved) setRevenueHistory(JSON.parse(saved));
+  // ── Business week helper ──────────────────────────────────────
+  function getBusinessWeek(dateISO: string): { key: string; label: string; startDate: Date; endDate: Date } {
+    // Parse the date at noon TT time to avoid any day-boundary issues
+    const d = new Date(dateISO + "T12:00:00-04:00");
+    const dow = d.getDay(); // 0=Sun … 6=Sat
+    const daysBack = dow === 0 ? 6 : dow - 1; // Mon=0 offset
+    const mon = new Date(d); mon.setDate(d.getDate() - daysBack); mon.setHours(0,0,0,0);
+    const sun = new Date(mon); sun.setDate(mon.getDate() + 6); sun.setHours(23,59,59,999);
+    const fmt = (dt: Date) => dt.toLocaleDateString("en-TT", { day: "numeric", month: "short" });
+    const year = sun.getFullYear();
+    const key = mon.toISOString().split("T")[0]; // e.g. "2026-09-28"
+    const label = `${fmt(mon)} – ${fmt(sun)} ${year}`;
+    return { key, label, startDate: mon, endDate: sun };
+  }
+
+  function getNowTT(): Date {
+    return new Date(new Date().toLocaleString("en-US", { timeZone: "America/Port_of_Spain" }));
+  }
+
+  function getCurrentWeekKey(): string {
+    return getBusinessWeek(getNowTT().toISOString().split("T")[0]).key;
+  }
+
+  function getLastWeekKey(): string {
+    const now = getNowTT();
+    const d = new Date(now); d.setDate(d.getDate() - 7);
+    return getBusinessWeek(d.toISOString().split("T")[0]).key;
   }
 
   async function fetchSettings() {
@@ -295,12 +322,6 @@ export default function AdminPage() {
     for (const id of activeIds) {
       await supabase.from("orders").update({ status: "completed" }).eq("id", id);
     }
-    const weekRevenue = orders.filter(o => activeIds.includes(o.id)).reduce((s,o)=>s+o.total,0);
-    const weekLabel = new Date().toLocaleDateString("en-TT", { month: "short", day: "numeric", year: "numeric" });
-    const newEntry = { week: weekLabel, revenue: weekRevenue, orders: activeIds.length };
-    const newHistory = [newEntry, ...revenueHistory.slice(0, 11)];
-    setRevenueHistory(newHistory);
-    localStorage.setItem("revenue_history", JSON.stringify(newHistory));
     setOrders(prev => prev.map(o => activeIds.includes(o.id) ? { ...o, status: "completed" as OrderStatus } : o));
     setMarkingComplete(false);
   }
@@ -531,17 +552,23 @@ export default function AdminPage() {
             <p style={{ fontFamily: FONT_BODY, fontSize: "11px", fontWeight: "700", letterSpacing: "0.1em", textTransform: "uppercase" as const, color: C.muted, marginBottom: "10px" }}>Menu Items</p>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "20px" }}>
               {[
-                { key: "menu_solo_shrimp", label: "Club Solo — Shrimp"      },
-                { key: "menu_solo_crab",   label: "Club Solo — Snow Crab"   },
-                { key: "menu_solo_mix",    label: "Club Solo — Mix"         },
-                { key: "menu_duo_shrimp",  label: "Club Duo — Shrimp"       },
-                { key: "menu_duo_crab",    label: "Club Duo — Snow Crab"    },
-                { key: "menu_duo_mix",     label: "Club Duo — Mix"          },
-                { key: "menu_ramen",       label: "Shrimp Alfredo Ramen"    },
-                { key: "menu_wings",       label: "Wings Boil"              },
-                { key: "menu_combo",       label: "Ramen Wings Combo"       },
-                { key: "menu_sauce",       label: "Pepper Sauce"            },
-                { key: "menu_build",       label: "Build Your Own Boil"     },
+                { key: "menu_solo_shrimp",         label: "Club Solo — Shrimp"              },
+                { key: "menu_solo_crab",           label: "Club Solo — Snow Crab"           },
+                { key: "menu_solo_mix",            label: "Club Solo — Mix"                 },
+                { key: "menu_duo_shrimp",          label: "Club Duo — Shrimp"               },
+                { key: "menu_duo_crab",            label: "Club Duo — Snow Crab"            },
+                { key: "menu_duo_mix",             label: "Club Duo — Mix"                  },
+                { key: "menu_lobster_half",        label: "🦞 Half Lobster Boil"            },
+                { key: "menu_lobster_whole",       label: "🦞 Whole Lobster Boil"           },
+                { key: "menu_lobster_shrimp_half", label: "🦞 Shrimp & Half Lobster"        },
+                { key: "menu_lobster_shrimp_whole",label: "🦞 Shrimp & Whole Lobster"       },
+                { key: "menu_lobster_loaded_half", label: "🦞 Loaded Half Lobster"          },
+                { key: "menu_lobster_loaded_whole",label: "🦞 Loaded Whole Lobster"         },
+                { key: "menu_ramen",               label: "Shrimp Alfredo Ramen"            },
+                { key: "menu_wings",               label: "Wings Boil"                      },
+                { key: "menu_combo",               label: "Ramen Wings Combo"               },
+                { key: "menu_sauce",               label: "Pepper Sauce"                    },
+                { key: "menu_build",               label: "Build Your Own Boil"             },
               ].map(item => (
                 <div key={item.key} onClick={() => setMenuItems(prev => ({ ...prev, [item.key]: !prev[item.key] }))}
                   style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 14px", borderRadius: "4px", border: menuItems[item.key] ? `1px solid ${C.gold}` : `1px solid ${C.border}`, cursor: "pointer", backgroundColor: menuItems[item.key] ? C.goldDim : "#FAFAFA" }}>
@@ -557,16 +584,22 @@ export default function AdminPage() {
             <p style={{ fontFamily: FONT_BODY, fontSize: "11px", fontWeight: "700", letterSpacing: "0.1em", textTransform: "uppercase" as const, color: C.muted, marginBottom: "10px" }}>Fan Favourites</p>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "20px" }}>
               {[
-                { key: "fav_solo_shrimp", label: "Solo — Shrimp"        },
-                { key: "fav_solo_crab",   label: "Solo — Snow Crab"     },
-                { key: "fav_solo_mix",    label: "Solo — Mix"           },
-                { key: "fav_duo_shrimp",  label: "Duo — Shrimp"         },
-                { key: "fav_duo_crab",    label: "Duo — Snow Crab"      },
-                { key: "fav_duo_mix",     label: "Duo — Mix"            },
-                { key: "fav_ramen",       label: "Shrimp Alfredo Ramen" },
-                { key: "fav_wings",       label: "Wings Boil"           },
-                { key: "fav_combo",       label: "Ramen Wings Combo"    },
-                { key: "fav_build",       label: "Build Your Own Boil"  },
+                { key: "fav_solo_shrimp",         label: "Solo — Shrimp"                   },
+                { key: "fav_solo_crab",           label: "Solo — Snow Crab"                },
+                { key: "fav_solo_mix",            label: "Solo — Mix"                      },
+                { key: "fav_duo_shrimp",          label: "Duo — Shrimp"                    },
+                { key: "fav_duo_crab",            label: "Duo — Snow Crab"                 },
+                { key: "fav_duo_mix",             label: "Duo — Mix"                       },
+                { key: "fav_lobster_half",        label: "🦞 Half Lobster Boil"            },
+                { key: "fav_lobster_whole",       label: "🦞 Whole Lobster Boil"           },
+                { key: "fav_lobster_shrimp_half", label: "🦞 Shrimp & Half Lobster"        },
+                { key: "fav_lobster_shrimp_whole",label: "🦞 Shrimp & Whole Lobster"       },
+                { key: "fav_lobster_loaded_half", label: "🦞 Loaded Half Lobster"          },
+                { key: "fav_lobster_loaded_whole",label: "🦞 Loaded Whole Lobster"         },
+                { key: "fav_ramen",               label: "Shrimp Alfredo Ramen"            },
+                { key: "fav_wings",               label: "Wings Boil"                      },
+                { key: "fav_combo",               label: "Ramen Wings Combo"               },
+                { key: "fav_build",               label: "Build Your Own Boil"             },
               ].map(item => (
                 <div key={item.key} onClick={() => setFavItems(prev => ({ ...prev, [item.key]: !prev[item.key] }))}
                   style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 14px", borderRadius: "4px", border: favItems[item.key] ? "1px solid #FFD700" : `1px solid ${C.border}`, cursor: "pointer", backgroundColor: favItems[item.key] ? "#FFFBE6" : "#FAFAFA" }}>
@@ -694,24 +727,265 @@ export default function AdminPage() {
             </button>
           </div>
 
-          {/* Revenue History */}
-          {revenueHistory.length > 0 && (
-            <div className="admin-card" style={{ backgroundColor: C.white, borderRadius: "6px", border: `1px solid ${C.border}`, padding: "24px", marginBottom: "24px" }}>
-              <p style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "0.1em", textTransform: "uppercase" as const, color: C.gold, marginBottom: "6px" }}>History</p>
-              <h3 style={{ fontFamily: FONT_DISPLAY, fontSize: "20px", fontWeight: "400", color: C.black, marginBottom: "20px" }}>Weekly Revenue</h3>
-              <div style={{ display: "grid", gap: "8px" }}>
-                {revenueHistory.map((entry, i) => (
-                  <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", backgroundColor: i === 0 ? "#EAFFF0" : C.cream, borderRadius: "4px", border: `1px solid ${i === 0 ? "#8FD4A0" : C.border}` }}>
-                    <div>
-                      <p style={{ fontWeight: "600", fontSize: "14px", color: C.black }}>{entry.week}</p>
-                      <p style={{ fontSize: "12px", color: C.muted, marginTop: "2px" }}>{entry.orders} order{entry.orders !== 1 ? "s" : ""}</p>
+          {/* Weekly Order Archive */}
+          {completedOrders.length > 0 && (() => {
+            const curKey  = getCurrentWeekKey();
+            const lastKey = getLastWeekKey();
+
+            // Orders that have a schedulable date
+            const withFD = completedOrders.filter(o => getFulfilmentDate(o) !== null);
+            // Orders with no derivable date → Needs Review
+            const needsReview = completedOrders.filter(o => getFulfilmentDate(o) === null);
+
+            // Group by week key
+            const weekGroups: Record<string, { key: string; label: string; orders: Order[] }> = {};
+            withFD.forEach(o => {
+              const fd = getFulfilmentDate(o)!;
+              const wk = getBusinessWeek(fd);
+              if (!weekGroups[wk.key]) weekGroups[wk.key] = { key: wk.key, label: wk.label, orders: [] };
+              weekGroups[wk.key].orders.push(o);
+            });
+
+            const thisWeekCompleted = weekGroups[curKey]?.orders || [];
+            const lastWeekCompleted = weekGroups[lastKey]?.orders || [];
+            const olderWeeks = Object.values(weekGroups)
+              .filter(wk => wk.key !== curKey && wk.key !== lastKey)
+              .sort((a, b) => b.key.localeCompare(a.key));
+
+            // Active (non-completed) orders this week for display alongside
+            const thisWeekActive = orders.filter(o => {
+              if (o.status === "completed" || o.status === "cancelled") return false;
+              const fd = getFulfilmentDate(o); if (!fd) return false;
+              return getBusinessWeek(fd).key === curKey;
+            });
+
+            function renderOrderCard(order: Order) {
+              const cfg2 = STATUS_CONFIG[order.status];
+              const isExpanded2 = expanded === order.id;
+              return (
+                <div key={order.id} className="admin-card" style={{ backgroundColor: C.white, borderRadius: "6px", border: `1px solid ${C.border}`, overflow: "hidden" }}>
+                  <div onClick={() => setExpanded(isExpanded2 ? null : order.id)} style={{ padding: "18px 20px", display: "flex", alignItems: "center", gap: "16px", cursor: "pointer", flexWrap: "wrap" as const }}>
+                    <span style={{ backgroundColor: cfg2.bg, color: cfg2.color, fontSize: "11px", fontWeight: "700", letterSpacing: "0.08em", padding: "4px 10px", borderRadius: "20px", whiteSpace: "nowrap" as const }}>{cfg2.label}</span>
+                    <div style={{ flex: 1, minWidth: "160px" }}>
+                      <p style={{ fontWeight: "600", fontSize: "15px", color: C.black }}>{order.name}</p>
+                      <p style={{ fontSize: "12px", color: C.muted, marginTop: "2px" }}>{order.package}</p>
                     </div>
-                    <p style={{ fontFamily: FONT_DISPLAY, fontSize: "20px", color: i === 0 ? "#1A7A3A" : C.black }}>TT${entry.revenue}</p>
+                    {order.notes && order.notes.includes("Day:") && (
+                      <span style={{ backgroundColor: "#EBF3FF", color: "#1A56A4", fontSize: "11px", fontWeight: "700", padding: "3px 10px", borderRadius: "20px", whiteSpace: "nowrap" as const }}>
+                        📅 {order.notes.match(/Day: (\w+)/)?.[1] || ""}
+                      </span>
+                    )}
+                    <span style={{ fontSize: "13px", color: C.muted, whiteSpace: "nowrap" as const }}>{order.fulfillment === "delivery" ? "🚗 Delivery" : "🏠 Pickup"}</span>
+                    <span style={{ fontFamily: FONT_DISPLAY, fontSize: "17px", color: C.black, whiteSpace: "nowrap" as const }}>TT${order.total}</span>
+                    <span style={{ color: C.muted, fontSize: "18px" }}>{isExpanded2 ? "▲" : "▼"}</span>
                   </div>
-                ))}
+                  {isExpanded2 && (
+                    <div style={{ padding: "20px", borderTop: `1px solid ${C.border}`, backgroundColor: C.cream }}>
+                      <div style={{ display: "grid", gap: "6px", marginBottom: "16px", fontSize: "13px" }}>
+                        <p><strong>Phone:</strong> <a href={`tel:${order.phone}`} style={{ color: C.gold }}>{order.phone}</a></p>
+                        {order.email && <p><strong>Email:</strong> {order.email}</p>}
+                        {order.address && <p><strong>Address:</strong> {order.address}</p>}
+                        {(order.details || []).map((d, i) => <p key={i} style={{ color: C.charcoal }}>· {d}</p>)}
+                        {order.notes && <p style={{ backgroundColor: "#FFFBE6", border: "1px solid #F0C04A", borderRadius: "4px", padding: "8px 12px", marginTop: "4px" }}>{order.notes}</p>}
+                      </div>
+                      <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" as const, marginBottom: editingOrder === order.id ? "16px" : "0" }}>
+                        {editingOrder !== order.id && (
+                          <button onClick={() => startEdit(order)} style={{ backgroundColor: C.white, color: C.charcoal, padding: "9px 18px", borderRadius: "4px", border: `1px solid ${C.border}`, fontFamily: FONT_BODY, fontWeight: "600", fontSize: "12px", cursor: "pointer" }}>✏️ Edit Order</button>
+                        )}
+                        {cfg2.next && (
+                          <button onClick={() => advanceStatus(order.id, order.status)} style={{ background: `linear-gradient(135deg, ${C.gold}, #E8B84B)`, color: C.black, padding: "9px 18px", borderRadius: "4px", border: "none", fontFamily: FONT_BODY, fontWeight: "700", fontSize: "12px", cursor: "pointer" }}>{cfg2.nextLabel}</button>
+                        )}
+                        <a href={`tel:${order.phone}`} style={{ backgroundColor: C.white, color: C.charcoal, padding: "9px 18px", borderRadius: "4px", border: `1px solid ${C.border}`, fontFamily: FONT_BODY, fontWeight: "600", fontSize: "12px", textDecoration: "none", display: "inline-flex", alignItems: "center" }}>📞 Call</a>
+                        <button onClick={() => deleteOrder(order.id)} style={{ backgroundColor: C.white, color: "#C0392B", padding: "9px 18px", borderRadius: "4px", border: "1px solid #F5C6C6", fontFamily: FONT_BODY, fontWeight: "500", fontSize: "12px", cursor: "pointer" }}>🗑 Delete</button>
+                      </div>
+                      {editingOrder === order.id && (
+                        <div style={{ marginTop: "16px", padding: "20px", backgroundColor: C.white, borderRadius: "6px", border: `1px solid ${C.gold}` }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+                            <p style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "0.1em", textTransform: "uppercase" as const, color: C.gold }}>Edit Order</p>
+                            {editSaved && <p style={{ fontSize: "12px", color: "#1A7A3A", fontWeight: "700" }}>✅ Saved!</p>}
+                          </div>
+                          {showEditConfirm && editBefore && (
+                            <div style={{ backgroundColor: C.cream, border: `1px solid ${C.border}`, borderRadius: "4px", padding: "12px 16px", marginBottom: "16px", fontSize: "12px" }}>
+                              <p style={{ fontWeight: "700", color: C.charcoal, marginBottom: "6px" }}>Confirm Changes:</p>
+                              {editBefore.name !== editName && <p style={{ color: C.muted }}>Name: <s>{editBefore.name}</s> → <strong>{editName}</strong></p>}
+                              {editBefore.phone !== editPhone && <p style={{ color: C.muted }}>Phone: <s>{editBefore.phone}</s> → <strong>{editPhone}</strong></p>}
+                              {String(editBefore.total) !== editTotal && <p style={{ color: C.muted }}>Total: <s>TT${editBefore.total}</s> → <strong style={{ color: C.gold }}>TT${editTotal}</strong></p>}
+                              {editBefore.fulfillment !== editFulfill && <p style={{ color: C.muted }}>Fulfillment: <s>{editBefore.fulfillment}</s> → <strong>{editFulfill}</strong></p>}
+                              {editBefore.status !== editStatus && <p style={{ color: C.muted }}>Status: <s>{editBefore.status}</s> → <strong>{editStatus}</strong></p>}
+                            </div>
+                          )}
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "10px" }}>
+                            {[
+                              { label: "Name",       value: editName,  set: setEditName  },
+                              { label: "Phone",      value: editPhone, set: setEditPhone },
+                              { label: "Email",      value: editEmail, set: setEditEmail },
+                              { label: "Total (TT$)",value: editTotal, set: setEditTotal, type: "number" },
+                            ].map(f => (
+                              <div key={f.label}>
+                                <label style={{ fontSize: "10px", fontWeight: "700", color: C.muted, display: "block", marginBottom: "4px", textTransform: "uppercase" as const, letterSpacing: "0.08em" }}>{f.label}</label>
+                                <input type={f.type || "text"} value={f.value} onChange={e => f.set(e.target.value)} style={inputStyle} />
+                              </div>
+                            ))}
+                          </div>
+                          <div style={{ marginBottom: "10px" }}>
+                            <label style={{ fontSize: "10px", fontWeight: "700", color: C.muted, display: "block", marginBottom: "6px", textTransform: "uppercase" as const, letterSpacing: "0.08em" }}>Order Day</label>
+                            <div style={{ display: "flex", gap: "6px" }}>
+                              {["Thursday","Friday","Saturday"].map(d => (
+                                <button key={d} onClick={() => setEditOrderDay(d)} style={{ flex: 1, padding: "8px 4px", borderRadius: "4px", border: editOrderDay === d ? `2px solid ${C.gold}` : `1px solid ${C.border}`, backgroundColor: editOrderDay === d ? C.goldDim : C.white, cursor: "pointer", fontFamily: FONT_BODY, fontSize: "12px", fontWeight: editOrderDay === d ? "700" : "400", color: editOrderDay === d ? C.gold : C.muted }}>{d}</button>
+                              ))}
+                            </div>
+                          </div>
+                          <div style={{ marginBottom: "10px" }}>
+                            <label style={{ fontSize: "10px", fontWeight: "700", color: C.muted, display: "block", marginBottom: "6px", textTransform: "uppercase" as const, letterSpacing: "0.08em" }}>Status</label>
+                            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" as const }}>
+                              {(["new","confirmed","ready","completed","cancelled"] as OrderStatus[]).map(s => (
+                                <button key={s} onClick={() => setEditStatus(s)} style={{ padding: "7px 12px", borderRadius: "4px", border: editStatus === s ? `2px solid ${STATUS_CONFIG[s].color}` : `1px solid ${C.border}`, backgroundColor: editStatus === s ? STATUS_CONFIG[s].bg : C.white, cursor: "pointer", fontFamily: FONT_BODY, fontSize: "11px", fontWeight: editStatus === s ? "700" : "400", color: editStatus === s ? STATUS_CONFIG[s].color : C.muted, textTransform: "capitalize" as const }}>{s}</button>
+                              ))}
+                            </div>
+                          </div>
+                          <div style={{ marginBottom: "10px" }}>
+                            <label style={{ fontSize: "10px", fontWeight: "700", color: C.muted, display: "block", marginBottom: "6px", textTransform: "uppercase" as const, letterSpacing: "0.08em" }}>Payment Method</label>
+                            <div style={{ display: "flex", gap: "6px" }}>
+                              {[["cash_on_delivery","💵 Cash on Delivery"],["online_payment","🏦 Online/Bank"]].map(([val, lbl]) => (
+                                <button key={val} onClick={() => setEditPayMethod(val)} style={{ flex: 1, padding: "8px", borderRadius: "4px", border: editPayMethod === val ? `2px solid ${C.gold}` : `1px solid ${C.border}`, backgroundColor: editPayMethod === val ? C.goldDim : C.white, cursor: "pointer", fontFamily: FONT_BODY, fontSize: "12px", fontWeight: editPayMethod === val ? "700" : "400", color: editPayMethod === val ? C.gold : C.muted }}>{lbl}</button>
+                              ))}
+                            </div>
+                          </div>
+                          <div style={{ marginBottom: "10px" }}>
+                            <label style={{ fontSize: "10px", fontWeight: "700", color: C.muted, display: "block", marginBottom: "6px", textTransform: "uppercase" as const, letterSpacing: "0.08em" }}>Fulfillment</label>
+                            <div style={{ display: "flex", gap: "6px" }}>
+                              <button onClick={() => setEditFulfill("pickup")} style={{ flex: 1, padding: "8px", borderRadius: "4px", border: editFulfill === "pickup" ? `2px solid ${C.gold}` : `1px solid ${C.border}`, backgroundColor: editFulfill === "pickup" ? C.goldDim : C.white, cursor: "pointer", fontFamily: FONT_BODY, fontSize: "12px", fontWeight: editFulfill === "pickup" ? "700" : "400", color: editFulfill === "pickup" ? C.gold : C.muted }}>🏠 Pickup</button>
+                              <button onClick={() => setEditFulfill("delivery")} style={{ flex: 1, padding: "8px", borderRadius: "4px", border: editFulfill === "delivery" ? `2px solid ${C.gold}` : `1px solid ${C.border}`, backgroundColor: editFulfill === "delivery" ? C.goldDim : C.white, cursor: "pointer", fontFamily: FONT_BODY, fontSize: "12px", fontWeight: editFulfill === "delivery" ? "700" : "400", color: editFulfill === "delivery" ? C.gold : C.muted }}>🚗 Delivery</button>
+                            </div>
+                          </div>
+                          {editFulfill === "delivery" && (
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "10px" }}>
+                              <div>
+                                <label style={{ fontSize: "10px", fontWeight: "700", color: C.muted, display: "block", marginBottom: "4px", textTransform: "uppercase" as const, letterSpacing: "0.08em" }}>Area</label>
+                                <select value={editArea} onChange={e => setEditArea(e.target.value)} style={{ ...inputStyle }}>
+                                  <option value="">Select...</option>
+                                  {["Arima","D'Abadie","Grand Bazaar","Cumuto","Valencia","Malabar","Piarco","Other"].map(a => <option key={a} value={a}>{a}</option>)}
+                                </select>
+                              </div>
+                              <div>
+                                <label style={{ fontSize: "10px", fontWeight: "700", color: C.muted, display: "block", marginBottom: "4px", textTransform: "uppercase" as const, letterSpacing: "0.08em" }}>Full Address</label>
+                                <input value={editAddress} onChange={e => setEditAddress(e.target.value)} style={inputStyle} />
+                              </div>
+                            </div>
+                          )}
+                          <div style={{ marginBottom: "14px" }}>
+                            <label style={{ fontSize: "10px", fontWeight: "700", color: C.muted, display: "block", marginBottom: "4px", textTransform: "uppercase" as const, letterSpacing: "0.08em" }}>Notes</label>
+                            <textarea value={editNotes} onChange={e => setEditNotes(e.target.value)} rows={2} style={{ ...inputStyle, resize: "vertical" }} />
+                          </div>
+                          <div style={{ display: "flex", gap: "8px" }}>
+                            {!showEditConfirm ? (
+                              <button onClick={() => setShowEditConfirm(true)} style={{ background: `linear-gradient(135deg, ${C.gold}, #E8B84B)`, color: C.black, padding: "10px 20px", borderRadius: "4px", border: "none", fontFamily: FONT_BODY, fontWeight: "700", fontSize: "12px", cursor: "pointer", textTransform: "uppercase" as const }}>Review Changes</button>
+                            ) : (
+                              <button onClick={() => saveEdit(order.id)} disabled={editSaving} style={{ background: `linear-gradient(135deg, ${C.gold}, #E8B84B)`, color: C.black, padding: "10px 20px", borderRadius: "4px", border: "none", fontFamily: FONT_BODY, fontWeight: "700", fontSize: "12px", cursor: "pointer", opacity: editSaving ? 0.7 : 1 }}>{editSaving ? "Saving..." : "✅ Confirm Save"}</button>
+                            )}
+                            {showEditConfirm && <button onClick={() => setShowEditConfirm(false)} style={{ backgroundColor: C.white, color: C.muted, padding: "10px 14px", borderRadius: "4px", border: `1px solid ${C.border}`, fontFamily: FONT_BODY, fontSize: "12px", cursor: "pointer" }}>Keep Editing</button>}
+                            <button onClick={() => { setEditingOrder(null); setShowEditConfirm(false); }} style={{ backgroundColor: C.white, color: C.muted, padding: "10px 14px", borderRadius: "4px", border: `1px solid ${C.border}`, fontFamily: FONT_BODY, fontSize: "12px", cursor: "pointer" }}>Cancel</button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+
+            function renderWeekHeader(label: string, orders_: Order[], isThisWeek: boolean) {
+              const revenue = orders_.filter(o => o.status === "completed").reduce((s, o) => s + o.total, 0);
+              const count = orders_.filter(o => o.status === "completed").length;
+              return (
+                <div style={{ display: "flex", alignItems: "baseline", gap: "12px", marginBottom: "12px", paddingBottom: "10px", borderBottom: `2px solid ${isThisWeek ? "#8FD4A0" : C.border}` }}>
+                  <span style={{ fontFamily: FONT_DISPLAY, fontSize: "17px", color: C.black }}>{label}</span>
+                  {count > 0 && <span style={{ fontSize: "12px", color: C.muted }}>{count} completed · TT${revenue} earned</span>}
+                </div>
+              );
+            }
+
+            return (
+              <div className="admin-card" style={{ backgroundColor: C.white, borderRadius: "6px", border: `1px solid ${C.border}`, padding: "24px", marginBottom: "24px" }}>
+                <p style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "0.1em", textTransform: "uppercase" as const, color: C.gold, marginBottom: "6px" }}>Order Archive</p>
+                <h3 style={{ fontFamily: FONT_DISPLAY, fontSize: "20px", fontWeight: "400", color: C.black, marginBottom: "24px" }}>Weekly History</h3>
+
+                {/* This Week */}
+                <div style={{ marginBottom: "32px" }}>
+                  {renderWeekHeader(weekGroups[curKey]?.label || getBusinessWeek(getNowTT().toISOString().split("T")[0]).label, [...thisWeekActive, ...thisWeekCompleted], true)}
+                  {thisWeekActive.length === 0 && thisWeekCompleted.length === 0 ? (
+                    <p style={{ color: C.muted, fontSize: "13px", padding: "16px 0" }}>No orders scheduled for this week yet.</p>
+                  ) : (
+                    <div style={{ display: "grid", gap: "8px" }}>
+                      {[...thisWeekActive, ...thisWeekCompleted].map(o => renderOrderCard(o))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Last Week */}
+                {(lastWeekCompleted.length > 0 || weekGroups[lastKey]) && (
+                  <div style={{ marginBottom: "32px" }}>
+                    {renderWeekHeader(weekGroups[lastKey]?.label || getBusinessWeek((() => { const d = getNowTT(); d.setDate(d.getDate()-7); return d.toISOString().split("T")[0]; })()).label, lastWeekCompleted, false)}
+                    {lastWeekCompleted.length === 0 ? (
+                      <p style={{ color: C.muted, fontSize: "13px", padding: "16px 0" }}>No completed orders last week.</p>
+                    ) : (
+                      <div style={{ display: "grid", gap: "8px" }}>
+                        {lastWeekCompleted.map(o => renderOrderCard(o))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Older Weeks */}
+                {olderWeeks.length > 0 && (
+                  <div style={{ marginBottom: "32px" }}>
+                    <p style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "0.1em", textTransform: "uppercase" as const, color: C.muted, marginBottom: "16px" }}>Older Weeks</p>
+                    {olderWeeks.map(wk => {
+                      const isCollapsed = collapsedWeeks.has(wk.key) || !collapsedWeeks.has(`open_${wk.key}`);
+                      const weekRevenue = wk.orders.reduce((s,o)=>s+o.total,0);
+                      const toggled = collapsedWeeks.has(wk.key);
+                      return (
+                        <div key={wk.key} style={{ marginBottom: "16px", border: `1px solid ${C.border}`, borderRadius: "6px", overflow: "hidden" }}>
+                          <div onClick={() => {
+                            setCollapsedWeeks(prev => {
+                              const next = new Set(prev);
+                              if (next.has(wk.key)) next.delete(wk.key); else next.add(wk.key);
+                              return next;
+                            });
+                          }}
+                            style={{ padding: "14px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", backgroundColor: C.cream }}>
+                            <div>
+                              <p style={{ fontFamily: FONT_DISPLAY, fontSize: "15px", color: C.black }}>{wk.label}</p>
+                              <p style={{ fontSize: "12px", color: C.muted, marginTop: "2px" }}>{wk.orders.length} orders · TT${weekRevenue} earned</p>
+                            </div>
+                            <span style={{ color: C.muted, fontSize: "16px" }}>{toggled ? "▼" : "▲"}</span>
+                          </div>
+                          {!toggled && (
+                            <div style={{ padding: "16px", display: "grid", gap: "8px" }}>
+                              {wk.orders.map(o => renderOrderCard(o))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Needs Review */}
+                {needsReview.length > 0 && (
+                  <div>
+                    <div style={{ display: "flex", alignItems: "baseline", gap: "12px", marginBottom: "12px", paddingBottom: "10px", borderBottom: `2px solid #F5C6C6` }}>
+                      <span style={{ fontFamily: FONT_DISPLAY, fontSize: "17px", color: "#A03030" }}>⚠️ Needs Review</span>
+                      <span style={{ fontSize: "12px", color: C.muted }}>{needsReview.length} orders — no scheduled date</span>
+                    </div>
+                    <div style={{ display: "grid", gap: "8px" }}>
+                      {needsReview.map(o => renderOrderCard(o))}
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* Filter tabs */}
           <div style={{ display: "flex", gap: "8px", marginBottom: "16px", flexWrap: "wrap" as const }}>

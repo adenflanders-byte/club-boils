@@ -82,6 +82,51 @@ const SIMPLE_ITEMS = [
   { id: "combo", name: "Club Ramen Wings Combo", desc: "Shrimp Alfredo Ramen Boil + Wings Boil — the ultimate combo", price: 120, image: "/wings2.jpeg", tag: "New" },
 ];
 
+const LOBSTER_PRODUCTS = [
+  {
+    id: "lobster_half",
+    name: "Half Lobster Boil",
+    desc: "½ lobster, sausage, boiled egg, clams, mussels, octopi, squid, corn, potatoes & House Butter Sauce",
+    soloPrice: 260, duoPrice: 360,
+    soloPortions: "½ lobster", duoPortions: "½ lobster (larger serving)",
+  },
+  {
+    id: "lobster_whole",
+    name: "Whole Lobster Boil",
+    desc: "1 whole lobster, sausage, boiled egg, clams, mussels, octopi, squid, corn, potatoes & House Butter Sauce",
+    soloPrice: 360, duoPrice: 550,
+    soloPortions: "1 whole lobster", duoPortions: "1 whole lobster (larger serving)",
+  },
+  {
+    id: "lobster_shrimp_half",
+    name: "Shrimp & Half Lobster Boil",
+    desc: "½ lobster, shrimp, sausage, boiled egg, clams, mussels, octopi, squid, corn, potatoes & House Butter Sauce",
+    soloPrice: 290, duoPrice: 460,
+    soloPortions: "½ lobster + 6 shrimp", duoPortions: "½ lobster + 12 shrimp",
+  },
+  {
+    id: "lobster_shrimp_whole",
+    name: "Shrimp & Whole Lobster Boil",
+    desc: "1 whole lobster, shrimp, sausage, boiled egg, clams, mussels, octopi, squid, corn, potatoes & House Butter Sauce",
+    soloPrice: 390, duoPrice: 610,
+    soloPortions: "1 whole lobster + 6 shrimp", duoPortions: "1 whole lobster + 12 shrimp",
+  },
+  {
+    id: "lobster_loaded_half",
+    name: "Loaded Half Lobster Boil",
+    desc: "½ lobster, shrimp, snow crab, sausage, boiled egg, clams, mussels, octopi, squid, corn, potatoes & House Butter Sauce",
+    soloPrice: 340, duoPrice: 560,
+    soloPortions: "½ lobster + shrimp + snow crab", duoPortions: "½ lobster + shrimp + snow crab (larger serving)",
+  },
+  {
+    id: "lobster_loaded_whole",
+    name: "Loaded Whole Lobster Boil",
+    desc: "1 whole lobster, shrimp, snow crab, sausage, boiled egg, clams, mussels, octopi, squid, corn, potatoes & House Butter Sauce",
+    soloPrice: 440, duoPrice: 710,
+    soloPortions: "1 whole lobster + shrimp + snow crab", duoPortions: "1 whole lobster + shrimp + snow crab (larger serving)",
+  },
+];
+
 const BASE = 60;
 const DELIVERY_FEE = 30;
 
@@ -161,15 +206,23 @@ export default function Home() {
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const [reviewSubmitted,  setReviewSubmitted]  = useState(false);
   const [ordersOpen, setOrdersOpen] = useState(true);
+  const [lobsterVariant, setLobsterVariant] = useState<Record<string, "solo"|"duo"|"">>({
+    lobster_half: "", lobster_whole: "", lobster_shrimp_half: "",
+    lobster_shrimp_whole: "", lobster_loaded_half: "", lobster_loaded_whole: "",
+  });
   const [favItems, setFavItems] = useState<Record<string, boolean>>({
     fav_solo_shrimp: false, fav_solo_crab: false, fav_solo_mix: false,
     fav_duo_shrimp: false,  fav_duo_crab: false,  fav_duo_mix: false,
     fav_ramen: false, fav_wings: false, fav_sauce: false, fav_build: false, fav_combo: false,
+    fav_lobster_half: false, fav_lobster_whole: false, fav_lobster_shrimp_half: false,
+    fav_lobster_shrimp_whole: false, fav_lobster_loaded_half: false, fav_lobster_loaded_whole: false,
   });
   const [menuItems,  setMenuItems]  = useState<Record<string, boolean>>({
     menu_solo_shrimp: true, menu_solo_crab: true, menu_solo_mix: true,
     menu_duo_shrimp: true,  menu_duo_crab: true,  menu_duo_mix: true,
     menu_ramen: true, menu_wings: true, menu_sauce: true, menu_build: true, menu_combo: true,
+    menu_lobster_half: true, menu_lobster_whole: true, menu_lobster_shrimp_half: true,
+    menu_lobster_shrimp_whole: true, menu_lobster_loaded_half: true, menu_lobster_loaded_whole: true,
   });
   const [visibleSections, setVisibleSections] = useState<Set<string>>(new Set());
   const [tiltStyle, setTiltStyle] = useState<Record<string, React.CSSProperties>>({});
@@ -811,6 +864,91 @@ export default function Home() {
                       </div>
                     </div>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {/* Lobster Boils */}
+            {LOBSTER_PRODUCTS.some(p => menuItems[`menu_${p.id}`]) && (
+              <div data-animate id="lobster-section" style={{ ...fadeIn("lobster-section"), maxWidth: "1000px", margin: "0 auto 80px" }}>
+                {/* Section header */}
+                <div style={{ display: "flex", alignItems: "baseline", gap: "16px", marginBottom: "32px", borderBottom: `1px solid ${border}`, paddingBottom: "16px" }}>
+                  <h3 style={{ fontFamily: "'Cinzel', serif", fontSize: "clamp(22px, 3vw, 32px)", fontWeight: "600", color: black }}>Lobster Boils</h3>
+                  <p style={{ fontSize: "12px", color: muted, letterSpacing: "0.06em" }}>Premium whole lobster · House Butter Sauce</p>
+                </div>
+
+                {/* Banner image */}
+                <div style={{ position: "relative", height: "220px", borderRadius: "4px", overflow: "hidden", marginBottom: "32px" }}>
+                  <img src="/lobster-intro.jpeg" alt="Lobster Boils" style={{ width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }} />
+                  <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to right, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.2) 60%, transparent 100%)", pointerEvents: "none" }} />
+                  <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column" as const, justifyContent: "center", padding: "40px" }}>
+                    <p style={{ fontSize: "10px", fontWeight: "700", letterSpacing: "0.2em", textTransform: "uppercase" as const, color: gold, marginBottom: "10px" }}>Limited · Premium Selection</p>
+                    <p style={{ fontFamily: "'Cinzel', serif", fontSize: "clamp(22px, 3vw, 34px)", color: white, lineHeight: 1.1, marginBottom: "8px" }}>Live Lobster. House Butter Sauce.</p>
+                    <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.7)" }}>Solo or Duo — choose your size below</p>
+                  </div>
+                </div>
+
+                {/* Portion & price guide image */}
+                <div style={{ marginBottom: "32px", borderRadius: "4px", overflow: "hidden", border: `1px solid ${border}` }}>
+                  <img src="/lobster-menu.jpeg" alt="Lobster portion and price guide" style={{ width: "100%", display: "block", pointerEvents: "none" }} />
+                </div>
+
+                {/* Product cards */}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "20px" }}>
+                  {LOBSTER_PRODUCTS.filter(p => menuItems[`menu_${p.id}`]).map(product => {
+                    const variant = lobsterVariant[product.id] || "solo";
+                    const price = variant === "duo" ? product.duoPrice : product.soloPrice;
+                    const portions = variant === "duo" ? product.duoPortions : product.soloPortions;
+                    return (
+                      <div key={product.id} className="menu-card"
+                        style={{ borderRadius: "4px", overflow: "hidden", backgroundColor: white, border: `1px solid ${border}`, transition: "box-shadow 0.3s ease" }}>
+                        <div style={{ position: "relative", height: "200px", overflow: "hidden", backgroundColor: "#1a1a1a" }}>
+                          <img src="/lobster-intro.jpeg" alt={product.name} style={{ width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }} />
+                          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.75) 0%, transparent 50%)", pointerEvents: "none" }} />
+                          {favItems[`fav_${product.id}`] && (
+                            <div style={{ position: "absolute", top: "12px", right: "12px", backgroundColor: "#FFD700", padding: "4px 10px", borderRadius: "1px" }}>
+                              <p style={{ fontFamily: "'Inter', sans-serif", fontSize: "9px", fontWeight: "800", letterSpacing: "0.1em", color: black, textTransform: "uppercase" as const }}>⭐ Fan Fav</p>
+                            </div>
+                          )}
+                          <div style={{ position: "absolute", bottom: "12px", left: "12px", right: "12px" }}>
+                            <p style={{ fontFamily: "'Cinzel', serif", fontSize: "16px", color: white, lineHeight: 1.2 }}>{product.name}</p>
+                          </div>
+                        </div>
+                        <div style={{ padding: "20px" }}>
+                          <p style={{ fontSize: "11px", color: muted, marginBottom: "14px", lineHeight: 1.6 }}>{portions}</p>
+
+                          {/* Solo / Duo toggle */}
+                          <div style={{ display: "flex", gap: "8px", marginBottom: "16px" }}>
+                            {(["solo", "duo"] as const).map(v => (
+                              <button key={v} onClick={() => setLobsterVariant(prev => ({ ...prev, [product.id]: v }))}
+                                style={{
+                                  flex: 1, padding: "8px", borderRadius: "2px", border: `1px solid ${variant === v ? gold : border}`,
+                                  backgroundColor: variant === v ? goldDim : "transparent",
+                                  cursor: "pointer", fontFamily: "'Inter', sans-serif", fontSize: "11px",
+                                  fontWeight: variant === v ? "700" : "400", color: variant === v ? gold : muted,
+                                  transition: "all 0.2s", textTransform: "uppercase" as const, letterSpacing: "0.06em",
+                                }}>
+                                {v === "solo" ? `Solo · TT$${product.soloPrice}` : `Duo · TT$${product.duoPrice}`}
+                              </button>
+                            ))}
+                          </div>
+
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <p style={{ fontFamily: "'Cinzel', serif", fontSize: "20px", color: gold, fontWeight: "600" }}>TT${price}</p>
+                            <button className="add-btn"
+                              onClick={() => ordersOpen && openCustomizer({
+                                id: `${product.id}-${variant}`,
+                                name: `${product.name} (${variant === "duo" ? "Duo" : "Solo"})`,
+                                desc: portions,
+                                basePrice: price,
+                              })}
+                              style={{ ...addBtn, opacity: ordersOpen ? 1 : 0.4 }}
+                              disabled={!ordersOpen}>+ Customize</button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
