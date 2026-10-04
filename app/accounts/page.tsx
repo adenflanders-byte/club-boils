@@ -134,7 +134,7 @@ export default function AccountsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [orders,       setOrders]       = useState<Order[]>([]);
   const [loading,      setLoading]      = useState(false);
-  const [activeTab,    setActiveTab]    = useState<"overview" | "pl" | "cashflow" | "transactions" | "receipts" | "health" | "allocation">("overview");
+  const [activeTab,    setActiveTab]    = useState<"overview" | "pl" | "cashflow" | "transactions" | "receipts" | "health" | "allocation" | "analytics">("overview");
   const [periodFilter, setPeriodFilter] = useState<"week" | "lastweek" | "month" | "lastmonth" | "year" | "all">("week");
 
   // Add/edit form
@@ -170,6 +170,16 @@ export default function AccountsPage() {
     { label: "Reinvest in Business",pct: 30, distributed: false },
     { label: "Emergency Fund",      pct: 10, distributed: false },
   ]);
+
+  // Analytics state
+  const [anPeriod,    setAnPeriod]    = useState<"daily" | "weekly" | "monthly" | "yearly">("weekly");
+  const [anRange,     setAnRange]     = useState<"8w" | "12w" | "6m" | "ytd" | "lastyear" | "all" | "custom">("8w");
+  const [anFrom,      setAnFrom]      = useState(ttDateStr(new Date()));
+  const [anTo,        setAnTo]        = useState(ttDateStr(new Date()));
+  const [anMetric,    setAnMetric]    = useState<"netProfit" | "earnedRevenue" | "collectedRevenue" | "orderCount" | "aov" | "margin">("netProfit");
+  const [anSeries,    setAnSeries]    = useState({ cogs: false, opEx: false, grossProfit: false, collected: false, orders: false, aov: false });
+  const [anIncCurrent,setAnIncCurrent]= useState(true);
+  const [anSort,      setAnSort]      = useState<{ col: string; dir: "asc" | "desc" }>({ col: "period", dir: "desc" });
 
   useEffect(() => {
     if (authed) { fetchTransactions(); fetchOrders(); }
@@ -502,7 +512,7 @@ export default function AccountsPage() {
 
           {/* Tabs */}
           <div style={{ display: "flex", gap: "8px", marginBottom: "28px", flexWrap: "wrap" as const }}>
-            {([["overview","📊 Overview"],["pl","📈 P&L"],["cashflow","💵 Cash Flow"],["transactions","📋 Transactions"],["receipts","🧾 Receipts"],["allocation","🥧 Allocation"],["health","❤️ Health"]] as const).map(([id, label]) => (
+            {([["overview","📊 Overview"],["pl","📈 P&L"],["cashflow","💵 Cash Flow"],["analytics","📉 Analytics"],["transactions","📋 Transactions"],["receipts","🧾 Receipts"],["allocation","🥧 Allocation"],["health","❤️ Health"]] as const).map(([id, label]) => (
               <button key={id} style={tabBtn(activeTab === id)} onClick={() => setActiveTab(id as any)}>{label}</button>
             ))}
           </div>
@@ -911,6 +921,453 @@ export default function AccountsPage() {
               </div>
             </div>
           )}
+
+          {/* ── ANALYTICS ── */}
+          {activeTab === "analytics" && (() => {
+            // ── Date range helper ──────────────────────────────────────
+            const now = toTT(new Date());
+            const nowStr = ttDateStr(now);
+
+            function getRangeDates(): [string, string] {
+              const y = now.getFullYear(), mo = now.getMonth(), d = now.getDate();
+              const dow = now.getDay();
+              const daysBack = dow === 0 ? 6 : dow - 1;
+              const thisMon = new Date(y, mo, d - daysBack);
+
+              if (anRange === "8w") {
+                const from = new Date(thisMon); from.setDate(thisMon.getDate() - 7 * 7);
+                return [ttDateStr(from), nowStr];
+              }
+              if (anRange === "12w") {
+                const from = new Date(thisMon); from.setDate(thisMon.getDate() - 7 * 11);
+                return [ttDateStr(from), nowStr];
+              }
+              if (anRange === "6m") {
+                const from = new Date(y, mo - 5, 1);
+                return [ttDateStr(from), nowStr];
+              }
+              if (anRange === "ytd") {
+                return [`${y}-01-01`, nowStr];
+              }
+              if (anRange === "lastyear") {
+                return [`${y - 1}-01-01`, `${y - 1}-12-31`];
+              }
+              if (anRange === "custom") {
+                return [anFrom, anTo];
+              }
+              // all
+              return ["2020-01-01", nowStr];
+            }
+
+            const [rangeFrom, rangeTo] = getRangeDates();
+
+            // ── Period key generators ──────────────────────────────────
+            function getPeriodKey(dateStr: string): string {
+              if (anPeriod === "daily")   return dateStr;
+              if (anPeriod === "weekly")  return getWeekKey(dateStr);
+              if (anPeriod === "monthly") return dateStr.slice(0, 7);
+              return dateStr.slice(0, 4);
+            }
+
+            function periodLabel(key: string): string {
+              if (anPeriod === "daily") {
+                const d = new Date(key + "T12:00:00-04:00");
+                return d.toLocaleDateString("en-TT", { month: "short", day: "numeric" });
+              }
+              if (anPeriod === "weekly") {
+                const d = new Date(key + "T12:00:00-04:00");
+                const end = new Date(d); end.setDate(d.getDate() + 6);
+                return `${d.toLocaleDateString("en-TT",{month:"short",day:"numeric"})}–${end.toLocaleDateString("en-TT",{month:"short",day:"numeric"})}`;
+              }
+              if (anPeriod === "monthly") {
+                const [yy, mm] = key.split("-");
+                return new Date(Number(yy), Number(mm) - 1, 1).toLocaleDateString("en-TT", { month: "short", year: "2-digit" });
+              }
+              return key;
+            }
+
+            // ── Determine current incomplete period ────────────────────
+            function currentPeriodKey(): string { return getPeriodKey(nowStr); }
+
+            // ── Build data map ─────────────────────────────────────────
+            type AnPoint = {
+              key: string;
+              earnedRevenue: number;
+              collectedRevenue: number;
+              cogs: number;
+              opEx: number;
+              grossProfit: number;
+              netProfit: number;
+              margin: number;
+              orderCount: number;
+              aov: number;
+              otherIncome: number;
+            };
+
+            const dataMap: Record<string, AnPoint> = {};
+            const ensureKey = (k: string) => {
+              if (!dataMap[k]) dataMap[k] = { key: k, earnedRevenue: 0, collectedRevenue: 0, cogs: 0, opEx: 0, grossProfit: 0, netProfit: 0, margin: 0, orderCount: 0, aov: 0, otherIncome: 0 };
+            };
+
+            // Completed orders by fulfilment date
+            completedOrders.forEach(o => {
+              const fd = getFulfilmentDate(o);
+              if (!fd || fd < rangeFrom || fd > rangeTo) return;
+              const k = getPeriodKey(fd);
+              ensureKey(k);
+              dataMap[k].earnedRevenue += o.total;
+              dataMap[k].orderCount++;
+            });
+
+            // Collected revenue by paid_at
+            completedOrders.forEach(o => {
+              if (!o.paid_at) return;
+              const pd = o.paid_at.slice(0, 10);
+              if (pd < rangeFrom || pd > rangeTo) return;
+              const k = getPeriodKey(pd);
+              ensureKey(k);
+              dataMap[k].collectedRevenue += (o.amount_paid || o.total);
+            });
+
+            // Transactions
+            transactions.forEach(t => {
+              if (t.date < rangeFrom || t.date > rangeTo) return;
+              const k = getPeriodKey(t.date);
+              ensureKey(k);
+              if (t.type === "income") dataMap[k].otherIncome += t.amount;
+              if (t.type === "expense") {
+                const isCogs = ["Ingredients", "Packaging"].includes(t.category);
+                if (isCogs) dataMap[k].cogs += t.amount;
+                else dataMap[k].opEx += t.amount;
+              }
+            });
+
+            // Derive gross/net/margin/aov
+            Object.values(dataMap).forEach(p => {
+              p.grossProfit = p.earnedRevenue - p.cogs;
+              p.netProfit   = p.grossProfit + p.otherIncome - p.opEx;
+              p.margin      = p.earnedRevenue > 0 ? Math.round((p.netProfit / p.earnedRevenue) * 100) : 0;
+              p.aov         = p.orderCount > 0 ? Math.round(p.earnedRevenue / p.orderCount) : 0;
+            });
+
+            // Sort chronologically
+            const curKey = currentPeriodKey();
+            let points = Object.values(dataMap).sort((a, b) => a.key.localeCompare(b.key));
+            if (!anIncCurrent) points = points.filter(p => p.key !== curKey);
+
+            // ── KPIs (sum of all points in range) ─────────────────────
+            const kpiEarned    = points.reduce((s, p) => s + p.earnedRevenue, 0);
+            const kpiCollected = points.reduce((s, p) => s + p.collectedRevenue, 0);
+            const kpiCogs      = points.reduce((s, p) => s + p.cogs, 0);
+            const kpiOpEx      = points.reduce((s, p) => s + p.opEx, 0);
+            const kpiGross     = kpiEarned - kpiCogs;
+            const kpiNet       = kpiGross - kpiOpEx + points.reduce((s, p) => s + p.otherIncome, 0);
+            const kpiMargin    = kpiEarned > 0 ? ((kpiNet / kpiEarned) * 100).toFixed(1) : "0";
+            const kpiOrders    = points.reduce((s, p) => s + p.orderCount, 0);
+            const kpiAOV       = kpiOrders > 0 ? Math.round(kpiEarned / kpiOrders) : 0;
+
+            // ── Best / Worst ──────────────────────────────────────────
+            const metricVal = (p: AnPoint): number => {
+              if (anMetric === "earnedRevenue")    return p.earnedRevenue;
+              if (anMetric === "collectedRevenue") return p.collectedRevenue;
+              if (anMetric === "orderCount")       return p.orderCount;
+              if (anMetric === "aov")              return p.aov;
+              if (anMetric === "margin")           return p.margin;
+              return p.netProfit;
+            };
+            const metricFmt = (v: number): string => {
+              if (anMetric === "orderCount") return String(v);
+              if (anMetric === "margin")     return `${v}%`;
+              return `TT$${v.toLocaleString()}`;
+            };
+            const metricLabel: Record<string, string> = {
+              netProfit:"Net Profit", earnedRevenue:"Earned Revenue", collectedRevenue:"Collected Revenue",
+              orderCount:"Orders", aov:"AOV", margin:"Margin"
+            };
+            const sorted = [...points].sort((a, b) => metricVal(b) - metricVal(a));
+            const best   = sorted[0];
+            const worst  = sorted[sorted.length - 1];
+
+            // ── Chart dimensions ──────────────────────────────────────
+            const chartH = 200;
+            const chartW = Math.max(points.length * 48, 400);
+            const barW   = Math.max(Math.floor(chartW / Math.max(points.length, 1)) - 8, 8);
+            const allVals = points.flatMap(p => [p.earnedRevenue, p.opEx + p.cogs, Math.max(0, p.netProfit)]);
+            const maxVal  = Math.max(...allVals, 1);
+            const toH = (v: number) => Math.max(0, Math.round((Math.max(0, v) / maxVal) * chartH));
+
+            // ── Sorted table ──────────────────────────────────────────
+            const tableData = [...points].sort((a, b) => {
+              const av = (p: AnPoint): any => {
+                if (anSort.col === "period")          return p.key;
+                if (anSort.col === "earned")          return p.earnedRevenue;
+                if (anSort.col === "collected")       return p.collectedRevenue;
+                if (anSort.col === "cogs")            return p.cogs;
+                if (anSort.col === "opex")            return p.opEx;
+                if (anSort.col === "gross")           return p.grossProfit;
+                if (anSort.col === "net")             return p.netProfit;
+                if (anSort.col === "margin")          return p.margin;
+                if (anSort.col === "orders")          return p.orderCount;
+                if (anSort.col === "aov")             return p.aov;
+                return p.key;
+              };
+              const va = av(a), vb = av(b);
+              return anSort.dir === "asc" ? (va > vb ? 1 : -1) : (va < vb ? 1 : -1);
+            });
+
+            function ThCol({ col, label }: { col: string; label: string }) {
+              const active = anSort.col === col;
+              return (
+                <th onClick={() => setAnSort(s => ({ col, dir: s.col === col && s.dir === "desc" ? "asc" : "desc" }))}
+                  style={{ padding: "10px 12px", textAlign: "left" as const, fontSize: "10px", fontWeight: "700", letterSpacing: "0.1em", textTransform: "uppercase" as const, color: active ? C.gold : C.muted, cursor: "pointer", whiteSpace: "nowrap" as const, userSelect: "none" as const, borderBottom: `2px solid ${active ? C.gold : C.border}` }}>
+                  {label}{active ? (anSort.dir === "desc" ? " ↓" : " ↑") : ""}
+                </th>
+              );
+            }
+
+            // ── CSV export ─────────────────────────────────────────────
+            function exportCSV() {
+              const rows = [
+                ["Period","Earned Revenue","Collected Revenue","COGS","Op Expenses","Gross Profit","Net Profit","Margin %","Orders","AOV"],
+                ...tableData.map(p => [periodLabel(p.key), p.earnedRevenue, p.collectedRevenue, p.cogs, p.opEx, p.grossProfit, p.netProfit, p.margin+"%", p.orderCount, p.aov])
+              ];
+              const csv = rows.map(r => r.join(",")).join("\n");
+              const a = document.createElement("a");
+              a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+              a.download = `club-boils-analytics-${rangeFrom}-${rangeTo}.csv`;
+              a.click();
+            }
+
+            const rangeLabels: Record<string, string> = {
+              "8w":"Last 8 Weeks","12w":"Last 12 Weeks","6m":"Last 6 Months","ytd":"This Year","lastyear":"Last Year","all":"All Time","custom":"Custom Range"
+            };
+
+            return (
+              <div>
+                {/* Title + controls */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "20px", flexWrap: "wrap" as const, gap: "12px" }}>
+                  <p style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "0.14em", color: C.gold, textTransform: "uppercase" as const }}>Profit Analytics</p>
+                  <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" as const, alignItems: "center" }}>
+                    <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", color: C.muted, cursor: "pointer" }}>
+                      <input type="checkbox" checked={anIncCurrent} onChange={e => setAnIncCurrent(e.target.checked)} style={{ accentColor: C.gold }} />
+                      Include current period
+                    </label>
+                  </div>
+                </div>
+
+                {/* Period selector */}
+                <div style={{ display: "flex", gap: "6px", marginBottom: "12px", flexWrap: "wrap" as const }}>
+                  {(["daily","weekly","monthly","yearly"] as const).map(p => (
+                    <button key={p} onClick={() => setAnPeriod(p)}
+                      style={{ padding: "6px 14px", borderRadius: "20px", border: anPeriod === p ? "none" : `1px solid ${C.border}`, cursor: "pointer", fontFamily: FB, fontSize: "10px", fontWeight: anPeriod === p ? "700" : "500", letterSpacing: "0.08em", backgroundColor: anPeriod === p ? C.black : "transparent", color: anPeriod === p ? C.white : C.muted, textTransform: "capitalize" as const }}>
+                      {p}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Range selector */}
+                <div style={{ display: "flex", gap: "6px", marginBottom: "24px", flexWrap: "wrap" as const }}>
+                  {(["8w","12w","6m","ytd","lastyear","all","custom"] as const).map(r => (
+                    <button key={r} onClick={() => setAnRange(r)}
+                      style={{ padding: "6px 12px", borderRadius: "20px", border: anRange === r ? "none" : `1px solid ${C.border}`, cursor: "pointer", fontFamily: FB, fontSize: "10px", fontWeight: anRange === r ? "700" : "500", letterSpacing: "0.06em", backgroundColor: anRange === r ? C.gold : "transparent", color: anRange === r ? C.black : C.muted }}>
+                      {rangeLabels[r]}
+                    </button>
+                  ))}
+                  {anRange === "custom" && (
+                    <div style={{ display: "flex", gap: "8px", alignItems: "center", marginTop: "8px", width: "100%" }}>
+                      <input type="date" value={anFrom} onChange={e => setAnFrom(e.target.value)} style={{ padding: "6px 10px", borderRadius: "4px", border: `1px solid ${C.border}`, fontSize: "12px", fontFamily: FB }} />
+                      <span style={{ color: C.muted, fontSize: "12px" }}>to</span>
+                      <input type="date" value={anTo} onChange={e => setAnTo(e.target.value)} style={{ padding: "6px 10px", borderRadius: "4px", border: `1px solid ${C.border}`, fontSize: "12px", fontFamily: FB }} />
+                    </div>
+                  )}
+                </div>
+
+                {/* KPI cards */}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "12px", marginBottom: "28px" }}>
+                  {[
+                    { label: "Earned Revenue", val: `TT$${kpiEarned.toLocaleString()}`, color: C.gold },
+                    { label: "Collected Revenue", val: `TT$${kpiCollected.toLocaleString()}`, color: C.muted },
+                    { label: "Net Profit", val: `TT$${kpiNet.toLocaleString()}`, color: kpiNet >= 0 ? C.green : C.red },
+                    { label: "Margin", val: `${kpiMargin}%`, color: Number(kpiMargin) >= 0 ? C.green : C.red },
+                    { label: "Orders", val: String(kpiOrders), color: C.charcoal },
+                    { label: "Avg Order Value", val: `TT$${kpiAOV.toLocaleString()}`, color: C.charcoal },
+                  ].map(({ label, val, color }) => (
+                    <div key={label} style={{ backgroundColor: C.white, border: `1px solid ${C.border}`, borderRadius: "6px", padding: "16px 18px" }}>
+                      <p style={{ fontSize: "10px", fontWeight: "700", letterSpacing: "0.1em", textTransform: "uppercase" as const, color: C.muted, marginBottom: "8px" }}>{label}</p>
+                      <p style={{ fontFamily: FD, fontSize: "20px", color }}>{val}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Chart */}
+                {points.length > 0 ? (
+                  <div style={{ backgroundColor: C.white, border: `1px solid ${C.border}`, borderRadius: "6px", padding: "24px", marginBottom: "24px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap" as const, gap: "8px" }}>
+                      <p style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "0.1em", color: C.muted, textTransform: "uppercase" as const }}>Revenue & Profit — {rangeLabels[anRange]}</p>
+                      <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" as const }}>
+                        {[{ key: "cogs", label: "COGS" }, { key: "opEx", label: "Op Exp" }, { key: "grossProfit", label: "Gross Profit" }, { key: "collected", label: "Collected" }, { key: "orders", label: "Order Count" }, { key: "aov", label: "AOV" }].map(({ key, label }) => (
+                          <label key={key} style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "10px", color: C.muted, cursor: "pointer" }}>
+                            <input type="checkbox" checked={(anSeries as any)[key]} onChange={e => setAnSeries(s => ({ ...s, [key]: e.target.checked }))} style={{ accentColor: C.gold }} />
+                            {label}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Legend */}
+                    <div style={{ display: "flex", gap: "16px", marginBottom: "16px", flexWrap: "wrap" as const }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}><div style={{ width: "12px", height: "12px", backgroundColor: C.gold, borderRadius: "2px" }} /><span style={{ fontSize: "11px", color: C.muted }}>Earned Revenue</span></div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}><div style={{ width: "12px", height: "12px", backgroundColor: C.charcoal, borderRadius: "2px" }} /><span style={{ fontSize: "11px", color: C.muted }}>Total Expenses</span></div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}><div style={{ width: "12px", height: "12px", backgroundColor: C.green, borderRadius: "2px" }} /><span style={{ fontSize: "11px", color: C.muted }}>Net Profit</span></div>
+                      {anSeries.collected && <div style={{ display: "flex", alignItems: "center", gap: "6px" }}><div style={{ width: "12px", height: "12px", backgroundColor: "#5B8DD9", borderRadius: "2px" }} /><span style={{ fontSize: "11px", color: C.muted }}>Collected</span></div>}
+                    </div>
+
+                    <div style={{ overflowX: "auto" as const }}>
+                      <svg width={chartW} height={chartH + 60} style={{ display: "block", minWidth: "100%", overflow: "visible" }}>
+                        {/* Y-axis guides */}
+                        {[0, 0.25, 0.5, 0.75, 1].map(pct => (
+                          <g key={pct}>
+                            <line x1={0} y1={chartH - pct * chartH} x2={chartW} y2={chartH - pct * chartH} stroke={C.border} strokeWidth={1} />
+                            <text x={0} y={chartH - pct * chartH - 4} fontSize={8} fill={C.muted} fontFamily={FB}>TT${Math.round(maxVal * pct).toLocaleString()}</text>
+                          </g>
+                        ))}
+
+                        {points.map((p, i) => {
+                          const x = i * (chartW / points.length) + 4;
+                          const isCurrent = p.key === curKey;
+                          const hRev = toH(p.earnedRevenue);
+                          const hExp = toH(p.cogs + p.opEx);
+                          const hNet = toH(p.netProfit);
+                          const hCol = toH(p.collectedRevenue);
+                          const isNeg = p.netProfit < 0;
+                          const netColor = isNeg ? C.red : C.green;
+                          const innerW = barW / (1 + (anSeries.collected ? 1 : 0) + (anSeries.cogs ? 1 : 0));
+
+                          return (
+                            <g key={p.key}>
+                              {/* Current period marker */}
+                              {isCurrent && <rect x={x - 4} y={0} width={barW + 16} height={chartH} fill="rgba(196,149,42,0.05)" rx={2} />}
+
+                              {/* Revenue bar */}
+                              <rect x={x} y={chartH - hRev} width={barW} height={hRev} fill={C.gold} opacity={0.85} rx={2} />
+                              {/* Expense overlay */}
+                              <rect x={x} y={chartH - hExp} width={barW * 0.5} height={hExp} fill={C.charcoal} opacity={0.6} rx={1} />
+                              {/* Net profit bar */}
+                              <rect x={x + barW * 0.55} y={chartH - hNet} width={barW * 0.45} height={hNet} fill={netColor} opacity={0.85} rx={1} />
+                              {/* Collected overlay */}
+                              {anSeries.collected && <rect x={x} y={chartH - hCol} width={barW} height={2} fill="#5B8DD9" />}
+
+                              {/* X label */}
+                              <text x={x + barW / 2} y={chartH + 16} fontSize={8} fill={C.muted} textAnchor="middle" fontFamily={FB}>{periodLabel(p.key)}</text>
+                              {isCurrent && <text x={x + barW / 2} y={chartH + 26} fontSize={7} fill={C.gold} textAnchor="middle" fontFamily={FB}>← now</text>}
+                            </g>
+                          );
+                        })}
+                      </svg>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ backgroundColor: C.white, border: `1px solid ${C.border}`, borderRadius: "6px", padding: "48px", textAlign: "center" as const, marginBottom: "24px" }}>
+                    <p style={{ color: C.muted, fontSize: "14px" }}>No data for selected range.</p>
+                  </div>
+                )}
+
+                {/* Best / Worst */}
+                <div style={{ marginBottom: "24px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", flexWrap: "wrap" as const, gap: "8px" }}>
+                    <p style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "0.1em", color: C.muted, textTransform: "uppercase" as const }}>Best & Worst Periods</p>
+                    <select value={anMetric} onChange={e => setAnMetric(e.target.value as any)}
+                      style={{ padding: "6px 10px", borderRadius: "4px", border: `1px solid ${C.border}`, fontSize: "11px", fontFamily: FB, backgroundColor: C.white, color: C.charcoal, cursor: "pointer" }}>
+                      {Object.entries(metricLabel).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                    </select>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                    {best && (
+                      <div style={{ backgroundColor: C.greenBg, border: `1px solid ${C.greenBorder}`, borderRadius: "6px", padding: "18px 20px" }}>
+                        <p style={{ fontSize: "10px", fontWeight: "700", letterSpacing: "0.12em", color: C.green, textTransform: "uppercase" as const, marginBottom: "6px" }}>🏆 Best {anPeriod.charAt(0).toUpperCase() + anPeriod.slice(1)}</p>
+                        <p style={{ fontFamily: FD, fontSize: "15px", color: C.charcoal, marginBottom: "4px" }}>{periodLabel(best.key)}</p>
+                        <p style={{ fontFamily: FD, fontSize: "22px", color: C.green }}>{metricFmt(metricVal(best))}</p>
+                        <p style={{ fontSize: "11px", color: C.muted, marginTop: "4px" }}>{metricLabel[anMetric]}</p>
+                      </div>
+                    )}
+                    {worst && worst.key !== best?.key && (
+                      <div style={{ backgroundColor: C.redBg, border: `1px solid ${C.redBorder}`, borderRadius: "6px", padding: "18px 20px" }}>
+                        <p style={{ fontSize: "10px", fontWeight: "700", letterSpacing: "0.12em", color: C.red, textTransform: "uppercase" as const, marginBottom: "6px" }}>📉 Lowest {anPeriod.charAt(0).toUpperCase() + anPeriod.slice(1)}</p>
+                        <p style={{ fontFamily: FD, fontSize: "15px", color: C.charcoal, marginBottom: "4px" }}>{periodLabel(worst.key)}</p>
+                        <p style={{ fontFamily: FD, fontSize: "22px", color: C.red }}>{metricFmt(metricVal(worst))}</p>
+                        <p style={{ fontSize: "11px", color: C.muted, marginTop: "4px" }}>{metricLabel[anMetric]}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Detail table */}
+                <div style={{ backgroundColor: C.white, border: `1px solid ${C.border}`, borderRadius: "6px", overflow: "hidden" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 20px", borderBottom: `1px solid ${C.border}`, flexWrap: "wrap" as const, gap: "8px" }}>
+                    <p style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "0.1em", color: C.muted, textTransform: "uppercase" as const }}>Detail Table</p>
+                    <button onClick={exportCSV} style={{ padding: "6px 14px", borderRadius: "4px", border: `1px solid ${C.border}`, backgroundColor: "transparent", fontSize: "10px", fontFamily: FB, fontWeight: "700", letterSpacing: "0.08em", color: C.muted, cursor: "pointer", textTransform: "uppercase" as const }}>⬇ Export CSV</button>
+                  </div>
+                  <div style={{ overflowX: "auto" as const }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse" as const, fontSize: "12px", fontFamily: FB }}>
+                      <thead style={{ backgroundColor: C.cream }}>
+                        <tr>
+                          <ThCol col="period"    label="Period" />
+                          <ThCol col="earned"    label="Earned Rev" />
+                          <ThCol col="collected" label="Collected" />
+                          <ThCol col="cogs"      label="COGS" />
+                          <ThCol col="opex"      label="Op Exp" />
+                          <ThCol col="gross"     label="Gross Profit" />
+                          <ThCol col="net"       label="Net Profit" />
+                          <ThCol col="margin"    label="Margin" />
+                          <ThCol col="orders"    label="Orders" />
+                          <ThCol col="aov"       label="AOV" />
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {tableData.map((p, i) => {
+                          const isCur = p.key === curKey;
+                          return (
+                            <tr key={p.key} style={{ backgroundColor: isCur ? "rgba(196,149,42,0.04)" : (i % 2 === 0 ? C.white : C.cream), borderBottom: `1px solid ${C.border}` }}>
+                              <td style={{ padding: "10px 12px", color: isCur ? C.gold : C.charcoal, fontWeight: isCur ? "700" : "400", whiteSpace: "nowrap" as const }}>
+                                {periodLabel(p.key)}{isCur ? " ★" : ""}
+                              </td>
+                              <td style={{ padding: "10px 12px", color: C.gold, fontWeight: "600", textAlign: "right" as const }}>TT${p.earnedRevenue.toLocaleString()}</td>
+                              <td style={{ padding: "10px 12px", color: C.muted, textAlign: "right" as const }}>TT${p.collectedRevenue.toLocaleString()}</td>
+                              <td style={{ padding: "10px 12px", color: C.muted, textAlign: "right" as const }}>TT${p.cogs.toLocaleString()}</td>
+                              <td style={{ padding: "10px 12px", color: C.muted, textAlign: "right" as const }}>TT${p.opEx.toLocaleString()}</td>
+                              <td style={{ padding: "10px 12px", color: C.charcoal, textAlign: "right" as const }}>TT${p.grossProfit.toLocaleString()}</td>
+                              <td style={{ padding: "10px 12px", color: p.netProfit >= 0 ? C.green : C.red, fontWeight: "600", textAlign: "right" as const }}>TT${p.netProfit.toLocaleString()}</td>
+                              <td style={{ padding: "10px 12px", color: p.margin >= 0 ? C.green : C.red, textAlign: "right" as const }}>{p.margin}%</td>
+                              <td style={{ padding: "10px 12px", color: C.charcoal, textAlign: "right" as const }}>{p.orderCount}</td>
+                              <td style={{ padding: "10px 12px", color: C.charcoal, textAlign: "right" as const }}>TT${p.aov.toLocaleString()}</td>
+                            </tr>
+                          );
+                        })}
+                        {tableData.length === 0 && (
+                          <tr><td colSpan={10} style={{ padding: "32px", textAlign: "center" as const, color: C.muted }}>No data for this range.</td></tr>
+                        )}
+                        {/* Totals row */}
+                        {tableData.length > 0 && (
+                          <tr style={{ backgroundColor: C.black, color: C.white, fontWeight: "700" }}>
+                            <td style={{ padding: "12px", color: C.gold, fontWeight: "700" }}>TOTAL</td>
+                            <td style={{ padding: "12px", color: C.gold, textAlign: "right" as const }}>TT${kpiEarned.toLocaleString()}</td>
+                            <td style={{ padding: "12px", color: C.white, textAlign: "right" as const }}>TT${kpiCollected.toLocaleString()}</td>
+                            <td style={{ padding: "12px", color: C.white, textAlign: "right" as const }}>TT${kpiCogs.toLocaleString()}</td>
+                            <td style={{ padding: "12px", color: C.white, textAlign: "right" as const }}>TT${kpiOpEx.toLocaleString()}</td>
+                            <td style={{ padding: "12px", color: C.white, textAlign: "right" as const }}>TT${kpiGross.toLocaleString()}</td>
+                            <td style={{ padding: "12px", color: kpiNet >= 0 ? C.green : C.red, textAlign: "right" as const }}>TT${kpiNet.toLocaleString()}</td>
+                            <td style={{ padding: "12px", color: Number(kpiMargin) >= 0 ? C.green : C.red, textAlign: "right" as const }}>{kpiMargin}%</td>
+                            <td style={{ padding: "12px", color: C.white, textAlign: "right" as const }}>{kpiOrders}</td>
+                            <td style={{ padding: "12px", color: C.white, textAlign: "right" as const }}>TT${kpiAOV.toLocaleString()}</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* ── HEALTH CHECK ── */}
           {activeTab === "health" && (
