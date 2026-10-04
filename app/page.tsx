@@ -186,6 +186,7 @@ export default function Home() {
   const [fulfillment, setFulfillment] = useState<"delivery" | "pickup" | "">("");
   const [paymentMethod,  setPaymentMethod]  = useState<"bank" | "cash" | "">("");
   const [deliveryArea,   setDeliveryArea]   = useState("");
+  const [deliveryAcknowledged, setDeliveryAcknowledged] = useState(false);
 
   // Approved East Trinidad delivery areas
   const EAST_AREAS = ["Arima","D'Abadie","Grand Bazaar","Cumuto","Valencia","Malabar","Piarco","Trincity","Arouca","El Dorado","Tacarigua","Carapo"];
@@ -426,11 +427,12 @@ export default function Home() {
     setTimeout(() => { menuRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }, 100);
   }
   async function handleSubmit() {
-    if (!name.trim() || !phone.trim())                 { alert("Please fill in your name and phone number."); return; }
-    if (!fulfillment)                                  { alert("Please choose delivery or pickup."); return; }
-    if (fulfillment === "delivery" && !address.trim()) { alert("Please enter your delivery address."); return; }
-    if (cart.length === 0)                             { alert("Your cart is empty!"); return; }
-    if (!paymentMethod)                                { alert("Please choose a payment method."); return; }
+    if (!name.trim() || !phone.trim())                               { alert("Please fill in your name and phone number."); return; }
+    if (!fulfillment)                                                { alert("Please choose delivery or pickup."); return; }
+    if (fulfillment === "delivery" && !address.trim())               { alert("Please enter your delivery address."); return; }
+    if (fulfillment === "delivery" && !deliveryAcknowledged)         { alert("Please acknowledge the delivery window before placing your order."); return; }
+    if (cart.length === 0)                                           { alert("Your cart is empty!"); return; }
+    if (!paymentMethod)                                              { alert("Please choose a payment method."); return; }
     if (!orderDay)                                     { alert("Please choose which day you are ordering for."); return; }
     setSubmitting(true); setSubmitError("");
     const details = cart.map(item => `${item.quantity}x ${item.name} (${item.description}) - TT$${item.price * item.quantity}`);
@@ -1246,15 +1248,25 @@ export default function Home() {
                 <div>
                   <label style={labelStyle}>Delivery or Pickup? *</label>
                   <div style={{ display: "flex", gap: "10px" }}>
-                    <button onClick={() => setFulfillment("pickup")}   style={fulfillBtn("pickup")}>🏠 Pickup</button>
+                    <button onClick={() => { setFulfillment("pickup"); setDeliveryAcknowledged(false); }}   style={fulfillBtn("pickup")}>🏠 Pickup</button>
                     <button onClick={() => setFulfillment("delivery")} style={fulfillBtn("delivery")}>🚗 Delivery (+TT$30)</button>
                   </div>
                 </div>
+                {fulfillment === "pickup" && (
+                  <div style={{ backgroundColor: "#EAFFF0", border: "1px solid #8FD4A0", borderRadius: "4px", padding: "12px 16px", marginTop: "10px" }}>
+                    <p style={{ fontSize: "12px", color: "#1A7A3A", lineHeight: 1.6 }}>🏠 <strong>Pickup begins at 11:30 AM</strong> in Arima. Please arrive during our operating window (11:30 AM – 6:00 PM).</p>
+                  </div>
+                )}
                 {fulfillment === "delivery" && (
                 <div>
+                  {/* Delivery window notice */}
+                  <div style={{ backgroundColor: "#EBF3FF", border: "1px solid #B8D4F5", borderRadius: "4px", padding: "14px 16px", marginBottom: "12px" }}>
+                    <p style={{ fontSize: "11px", fontWeight: "700", color: "#1A56A4", letterSpacing: "0.08em", textTransform: "uppercase" as const, marginBottom: "6px" }}>🚗 Delivery Window</p>
+                    <p style={{ fontSize: "12px", color: "#1A56A4", lineHeight: 1.7 }}>Deliveries begin at <strong>11:30 AM</strong> and may arrive at any time between <strong>11:30 AM and 6:00 PM</strong>. A lunchtime delivery is not guaranteed. Please ensure you are available to receive your order during this window.</p>
+                  </div>
                   {/* East-only delivery notice */}
                   <div style={{ backgroundColor: "#FFF8EC", border: "1px solid #F0C04A", borderRadius: "4px", padding: "12px 16px", marginBottom: "12px" }}>
-                    <p style={{ fontSize: "11px", fontWeight: "700", color: "#B8600A", letterSpacing: "0.08em", textTransform: "uppercase" as const, marginBottom: "4px" }}>⚠️ Delivery Notice</p>
+                    <p style={{ fontSize: "11px", fontWeight: "700", color: "#B8600A", letterSpacing: "0.08em", textTransform: "uppercase" as const, marginBottom: "4px" }}>⚠️ Area Notice</p>
                     <p style={{ fontSize: "12px", color: "#B8600A", lineHeight: 1.6 }}>Delivery is currently available to East Trinidad only. If your area is outside the East, please select Pickup in Arima. If you are unsure, <a href="https://wa.me/18682930570" target="_blank" rel="noopener noreferrer" style={{ color: "#B8600A", fontWeight: "700" }}>contact us</a> before placing your order.</p>
                   </div>
                   <label style={labelStyle}>Delivery Area *</label>
@@ -1379,6 +1391,13 @@ export default function Home() {
                   </div>
                 )}
 
+                {fulfillment === "delivery" && (
+                  <label style={{ display: "flex", alignItems: "flex-start", gap: "10px", padding: "14px 16px", backgroundColor: "#EBF3FF", border: "1px solid #B8D4F5", borderRadius: "4px", cursor: "pointer", marginBottom: "12px" }}>
+                    <input type="checkbox" checked={deliveryAcknowledged} onChange={e => setDeliveryAcknowledged(e.target.checked)} style={{ marginTop: "3px", accentColor: "#1A56A4", flexShrink: 0, width: "15px", height: "15px" }} />
+                    <span style={{ fontSize: "12px", color: "#1A56A4", lineHeight: 1.6 }}>I understand that delivery may arrive at any time between <strong>11:30 AM and 6:00 PM</strong> and is not guaranteed for lunchtime.</span>
+                  </label>
+                )}
+
                 {submitError && <div style={{ backgroundColor: "#FFECEC", border: "1px solid #F5C6C6", borderRadius: "2px", padding: "14px", fontSize: "12px", color: "#A03030" }}>⚠️ {submitError}</div>}
                 <button onClick={handleSubmit} disabled={submitting} style={{ ...goldBtn, width: "100%", padding: "18px", fontSize: "13px", opacity: submitting ? 0.7 : 1 }} className="gold-btn">
                   {submitting ? "Placing Order..." : `Confirm Order — TT$${totalPrice}`}
@@ -1403,6 +1422,11 @@ export default function Home() {
               {cart.map((item, idx) => <p key={idx} style={{ fontSize: "13px", color: muted, marginBottom: "6px", padding: "8px 0", borderBottom: `1px solid ${border}` }}>· {item.quantity}x {item.name} — {item.description}</p>)}
             </div>
             <p style={{ color: muted, fontSize: "13px", marginTop: "16px" }}>{fulfillment === "delivery" ? `🚗 Delivering to: ${address}` : "🏠 Pickup — Arima (Thu, Fri & Sat)"}</p>
+            {fulfillment === "delivery" && (
+              <div style={{ backgroundColor: "#EBF3FF", border: "1px solid #B8D4F5", borderRadius: "4px", padding: "12px 16px", margin: "10px auto", maxWidth: "440px", fontSize: "12px", color: "#1A56A4", lineHeight: 1.6, textAlign: "left" as const }}>
+                🕐 <strong>Delivery window: 11:30 AM – 6:00 PM.</strong> Please ensure you are available to receive your order. A lunchtime delivery is not guaranteed.
+              </div>
+            )}
             {orderDay && <p style={{ color: gold, fontSize: "15px", fontWeight: "700", marginTop: "8px" }}>📅 Your order is for {orderDay.charAt(0).toUpperCase() + orderDay.slice(1)}</p>}
             <p style={{ fontFamily: "'Cinzel', serif", fontSize: "28px", color: gold, margin: "20px 0 8px" }}>TT${totalPrice}</p>
             <p style={{ color: muted, fontSize: "12px", letterSpacing: "0.04em" }}>We will confirm via text to <strong>{phone}</strong> before Friday 8PM.</p>
@@ -1492,7 +1516,7 @@ export default function Home() {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "1px", backgroundColor: border }}>
               {[
                 { icon: "📍", label: "Location", value: "Arima, Trinidad", sub: "Exact address shared upon confirmation" },
-                { icon: "🕛", label: "Hours",    value: "Thu, Fri &amp; Sat", sub: "12:00 PM – 6:00 PM" },
+                { icon: "🕛", label: "Hours",    value: "Thu, Fri & Sat", sub: "12:00 PM – 6:00 PM" },
                 { icon: "📞", label: "Phone",    value: "868-293-0570", sub: "Call or WhatsApp", href: "tel:8682930570" },
                 { icon: "📸", label: "Instagram", value: "@theclub.boils", sub: "Follow for updates", href: "https://instagram.com/theclub.boils" },
               ].map(item => (
@@ -1517,6 +1541,7 @@ export default function Home() {
                 <strong style={{ color: gold }}>Delivery available</strong> to select areas in the East. A TT$30 fee applies. Contact us to confirm your area before placing your order.
               </p>
             </div>
+          </div>
         </section>
 
         {/* FOOTER */}
