@@ -61,10 +61,11 @@ const cartLines = [
   { itemId: "build_solo", quantity: 1, seafood: ["shrimp", "crab"], extras: ["corn"], heat: "hot" },
 ];
 const cartTotal = 2 * (130 + 25) + (60 + 30 + 50 + 5); // 455
+let POLICY = "alj-2026-10-15-v1";
 const student = (over = {}) => ({
   name: "Test Student", phone: "868-555-1234", email: "student@example.com", programme: "MBA 2026",
   studentId: "S123", notes: "No pork please", paymentMethod: "cash_on_collection", acknowledged: true,
-  policyVersion: "alj-2026-10-15-v1", lines: cartLines, expectedTotal: cartTotal, idempotencyKey: key(), ...over,
+  policyVersion: POLICY, lines: cartLines, expectedTotal: cartTotal, idempotencyKey: key(), ...over,
 });
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -219,6 +220,8 @@ await step("7. student access code checks", async () => {
 let cashOrder, bankOrder;
 await step("8. server-side pricing and validation", async () => {
   const menu = await studentApi.req(`/api/events/${SLUG}`);
+  POLICY = menu.data?.event?.policyVersion;
+  check("policy version exposed to the student page", typeof POLICY === "string" && POLICY.length > 3, POLICY);
   const ids = (menu.data?.menu || []).map(m => m.id);
   check("full active menu shown (incl. lobster)", ids.includes("solo_shrimp") && ids.includes("lobster_whole_solo") && ids.includes("build_duo"), `${ids.length} items`);
   check("event-hidden item not shown", !ids.includes("wings"));
@@ -247,7 +250,9 @@ await step("8. server-side pricing and validation", async () => {
   const row = sql(`select fulfilment_type||'|'||fulfillment||'|'||scheduled_fulfilment_date||'|'||coalesce(address,'∅')||'|'||delivery_fee||'|'||payment_status||'|'||amount_paid||'|'||(event_policy_acknowledged_at is not null)||'|'||event_policy_version from orders where order_number='${cashOrder.orderNumber}'`);
   check("saved as school-event collection, no address, no delivery fee", row.startsWith("school_event_collection|school_event_collection|2026-10-15|∅|0.00|"), row);
   check("cash order unpaid until recorded", row.includes("|pending_payment|0.00|"), row);
-  check("acknowledgement saved with version", row.endsWith("|true|alj-2026-10-15-v1"), row);
+  check("acknowledgement saved with version", row.endsWith(`|true|${POLICY}`), row);
+  const stale = await studentApi.req(`/api/events/${SLUG}/orders`, { method: "POST", body: student({ policyVersion: "old-version" }) });
+  check("acknowledging outdated terms is refused", stale.status === 400 && stale.data?.code === "ACK_REQUIRED");
   const snap = JSON.parse(sql(`select items from orders where order_number='${cashOrder.orderNumber}'`));
   check("item snapshot stored", snap.length === 2 && snap[0].unitPrice === 155 && snap[1].heat === "hot");
 
@@ -419,12 +424,12 @@ await step("14. menu changes flow to both pages", async () => {
   await page.locator("a[href='#menu']").first().click();
   await page.waitForTimeout(1500);
   check("main menu renders from shared menu", (await page.locator("text=Club Solo").count()) > 0);
-  check("switched-off item gone from main menu", !(await page.locator("text=Shrimp Alfredo Ramen Boil").count()));
+  check("switched-off item gone from main menu", (await page.locator("p", { hasText: /^Shrimp Alfredo Ramen Boil$/ }).count()) === 0);
   await page.close();
   const shopper = client({ "x-forwarded-for": "192.0.2.78" });
-  const r = await shopper.req("/api/orders", { method: "POST", body: { name: "R", phone: "8685550001", fulfillment: "pickup", paymentMethod: "cash_on_delivery", orderDay: "friday",
+  const r = await shopper.req("/api/orders", { method: "POST", body: { name: "Ramen Fan", phone: "8685550001", fulfillment: "pickup", paymentMethod: "cash_on_delivery", orderDay: "friday",
     lines: [{ itemId: "ramen", quantity: 1 }], expectedTotal: 100, idempotencyKey: key() } });
-  check("switched-off item cannot be ordered", r.status === 409);
+  check("switched-off item cannot be ordered", r.status === 409, `HTTP ${r.status} ${r.data?.error}`);
   check("earlier order snapshot unchanged", JSON.parse(sql(`select items from orders where order_number='${cashOrder.orderNumber}'`))[0].unitPrice === 155);
   await admin.req("/api/admin/db", { method: "POST", body: { table: "settings", op: "upsert", values: [{ key: "menu_ramen", value: "true" }] } });
 });
