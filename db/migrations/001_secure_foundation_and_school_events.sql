@@ -93,6 +93,8 @@ create table if not exists public.school_events (
   id                      uuid primary key default gen_random_uuid(),
   slug                    text not null unique check (slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'),
   school_name             text not null,
+  -- short label used in banners and the cart, e.g. "Arthur Lok Jack"
+  short_name              text not null default '',
   event_date              date not null,
   timezone                text not null default 'America/Port_of_Spain' check (timezone = 'America/Port_of_Spain'),
   order_cutoff_at         timestamptz not null,
@@ -196,6 +198,19 @@ begin
     alter table public.orders add constraint orders_status_check_v2
       check (status in ('new','confirmed','preparing','ready','completed','cancelled')) not valid;
   end if;
+
+  -- Same for the fulfillment column: add the distinct school-event value.
+  for c in
+    select conname from pg_constraint
+    where conrelid = 'public.orders'::regclass and contype = 'c'
+      and pg_get_constraintdef(oid) ilike '%fulfil%' and conname <> 'orders_fulfillment_check_v2'
+  loop
+    execute format('alter table public.orders drop constraint %I', c.conname);
+  end loop;
+  if not exists (select 1 from pg_constraint where conrelid = 'public.orders'::regclass and conname = 'orders_fulfillment_check_v2') then
+    alter table public.orders add constraint orders_fulfillment_check_v2
+      check (fulfillment is null or fulfillment in ('pickup','delivery','school_event_collection')) not valid;
+  end if;
 end $$;
 
 -- ---------------------------------------------------------------------
@@ -259,6 +274,7 @@ begin
   if ev.status <> 'open' then raise exception 'SCHOOL_EVENT_CLOSED'; end if;
   if now() >= ev.order_cutoff_at then raise exception 'SCHOOL_EVENT_CUTOFF_PASSED'; end if;
   new.fulfilment_type := 'school_event_collection';
+  new.fulfillment := 'school_event_collection';
   new.scheduled_fulfilment_date := ev.event_date;
   new.address := null;
   new.delivery_fee := 0;
@@ -444,11 +460,11 @@ begin
   if not found then raise exception 'SCHOOL_EVENT_NOT_FOUND'; end if;
   new_slug := left(ev.slug, 40) || '-copy-' || substr(md5(random()::text), 1, 6);
   insert into public.school_events(
-    slug, school_name, event_date, timezone, order_cutoff_at, collection_start_at, collection_end_at,
+    slug, school_name, short_name, event_date, timezone, order_cutoff_at, collection_start_at, collection_end_at,
     collection_location, collection_instructions, access_code_hash, access_code_version, session_ttl_minutes,
     status, event_fee, allowed_payment_methods, hidden_item_ids, student_id_required, policy_version, policy_text)
   values (
-    new_slug, ev.school_name, ev.event_date, ev.timezone, ev.order_cutoff_at, ev.collection_start_at, ev.collection_end_at,
+    new_slug, ev.school_name, ev.short_name, ev.event_date, ev.timezone, ev.order_cutoff_at, ev.collection_start_at, ev.collection_end_at,
     ev.collection_location, ev.collection_instructions, null, 1, ev.session_ttl_minutes,
     'draft', ev.event_fee, ev.allowed_payment_methods, ev.hidden_item_ids, ev.student_id_required,
     ev.policy_version, ev.policy_text)
@@ -463,12 +479,13 @@ end $$;
 --     Opens with NO access code; nobody can enter until one is set in Admin.
 -- ---------------------------------------------------------------------
 insert into public.school_events (
-  slug, school_name, event_date, order_cutoff_at, collection_start_at, collection_end_at,
+  slug, school_name, short_name, event_date, order_cutoff_at, collection_start_at, collection_end_at,
   collection_location, collection_instructions, status, event_fee, allowed_payment_methods,
   policy_version, policy_text)
 values (
   'arthur-lok-jack-oct-15-2026',
   'Arthur Lok Jack Global School of Business',
+  'Arthur Lok Jack',
   '2026-10-15',
   '2026-10-15T09:30:00-04:00',
   '2026-10-15T12:00:00-04:00',

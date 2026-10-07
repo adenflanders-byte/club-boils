@@ -139,7 +139,7 @@ begin
           '[{"itemId":"solo_shrimp"}]',130,0,'MBA 2026')
   returning id::text into oid;
   select * into c from public.orders where id::text = oid;
-  assert c.fulfilment_type = 'school_event_collection', 'fulfilment type not forced';
+  assert c.fulfilment_type = 'school_event_collection' and c.fulfillment = 'school_event_collection', 'fulfilment type not forced';
   assert c.scheduled_fulfilment_date = '2026-10-15', 'scheduled date not forced';
   assert c.address is null and c.delivery_fee = 0, 'address/delivery fee not cleared';
   assert c.order_number like 'CB-%', 'order number missing';

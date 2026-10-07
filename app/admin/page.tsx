@@ -1,8 +1,10 @@
 "use client";
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabaseClient";
+import { adminDb as supabase, adminFetch, adminSignOut } from "@/lib/adminApi";
+import { orderPaymentMethod } from "@/lib/payments";
+import PaymentPanel from "@/components/admin/PaymentPanel";
 
-type OrderStatus = "new" | "confirmed" | "ready" | "completed" | "cancelled";
+type OrderStatus = "new" | "confirmed" | "preparing" | "ready" | "completed" | "cancelled";
 interface Order {
   id: string;
   created_at: string;
@@ -16,11 +18,19 @@ interface Order {
   notes?: string | null;
   total: number;
   status: OrderStatus;
+  order_number?: string | null;
+  payment_method?: string | null;
+  payment_status?: string | null;
+  amount_paid?: number | null;
+  scheduled_fulfilment_date?: string | null;
+  school_event_id?: string | null;
+  programme_or_cohort?: string | null;
 }
 
 const STATUS_CONFIG: Record<OrderStatus, { label: string; color: string; bg: string; next: OrderStatus | null; nextLabel: string | null }> = {
   new:       { label: "New",       color: "#1A56A4", bg: "#EBF3FF", next: "confirmed", nextLabel: "Confirm Order"  },
   confirmed: { label: "Confirmed", color: "#6B3FA0", bg: "#F3ECFF", next: "ready",     nextLabel: "Mark Ready"     },
+  preparing: { label: "Preparing", color: "#8A5A00", bg: "#FFF3D6", next: "ready",     nextLabel: "Mark Ready"     },
   ready:     { label: "Ready",     color: "#B8600A", bg: "#FFF8EC", next: "completed", nextLabel: "Mark Completed" },
   completed: { label: "Completed", color: "#1A7A3A", bg: "#EAFFF0", next: null,        nextLabel: null             },
   cancelled: { label: "Cancelled", color: "#A03030", bg: "#FFECEC", next: null,        nextLabel: null             },
@@ -33,12 +43,10 @@ const C = {
 const FONT_DISPLAY = `'Cinzel', serif`;
 const FONT_BODY    = `'Inter', sans-serif`;
 const GOOGLE_FONTS = `@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@300;400;500;600;700&display=swap');`;
-const PASSWORD     = "anderson56$";
 
 export default function AdminPage() {
   const [authed,         setAuthed]         = useState(false);
-  const [pwInput,        setPwInput]        = useState("");
-  const [pwError,        setPwError]        = useState(false);
+  const [adminEmail,     setAdminEmail]     = useState("");
   const [orders,         setOrders]         = useState<Order[]>([]);
   const [loading,        setLoading]        = useState(false);
   const [filter,         setFilter]         = useState<"all" | OrderStatus>("all");
@@ -95,6 +103,13 @@ export default function AdminPage() {
 
   const [markingComplete,setMarkingComplete]= useState(false);
   const [collapsedWeeks, setCollapsedWeeks] = useState<Set<string>>(new Set());
+
+  // Access is enforced on the server; this only loads the signed-in email.
+  useEffect(() => {
+    adminFetch<{ email?: string }>("/api/admin/session").then(res => {
+      if (res.ok) { setAdminEmail(res.data.email || ""); setAuthed(true); }
+    });
+  }, []);
 
   useEffect(() => {
     if (authed) { fetchOrders(); fetchSettings(); fetchReviews(); }
@@ -161,9 +176,7 @@ export default function AdminPage() {
       { key: "day_friday",    value: String(openDays.friday)   },
       { key: "day_saturday",  value: String(openDays.saturday) },
     ];
-    for (const u of updates) {
-      await supabase.from("settings").upsert({ key: u.key, value: u.value }, { onConflict: "key" });
-    }
+    await supabase.from("settings").upsert(updates);
     setSettingsLoading(false); setSettingsSaved(true);
     setTimeout(() => setSettingsSaved(false), 3000);
   }
@@ -191,8 +204,8 @@ export default function AdminPage() {
   async function advanceStatus(id: string, currentStatus: OrderStatus) {
     const next = STATUS_CONFIG[currentStatus].next;
     if (!next) return;
-    await supabase.from("orders").update({ status: next }).eq("id", id);
-    setOrders(prev => prev.map(o => o.id === id ? { ...o, status: next } : o));
+    const { error } = await supabase.from("orders").update({ status: next }).eq("id", id);
+    if (!error) setOrders(prev => prev.map(o => o.id === id ? { ...o, status: next } : o));
   }
 
   async function deleteOrder(id: string) {
@@ -234,8 +247,10 @@ export default function AdminPage() {
       name: editName.trim(), phone: editPhone.trim(),
       email: editEmail.trim() || null,
       address: editFulfill === "delivery" ? editAddress.trim() : null,
-      notes: newNotes, total: Number(editTotal),
-      fulfillment: editFulfill, status: editStatus,
+      notes: newNotes,
+      ...(editBefore?.school_event_id ? {} : { total: Number(editTotal), fulfillment: editFulfill }),
+      ...(editPayMethod ? { payment_method: editPayMethod === "online_payment" ? "bank_transfer" : (editBefore?.school_event_id ? "cash_on_collection" : "cash_on_delivery") } : {}),
+      status: editStatus,
     }).eq("id", id);
     setOrders(prev => prev.map(o => o.id === id ? {
       ...o, name: editName.trim(), phone: editPhone.trim(),
@@ -254,7 +269,7 @@ export default function AdminPage() {
     await supabase.from("accounts").insert({
       type: "expense", category: quickExpCat,
       description: quickExpDesc.trim() || null,
-      amount: Math.round(Number(quickExpAmount)),
+      amount: Math.round(Number(quickExpAmount) * 100) / 100,
       date: new Date().toISOString().split("T")[0],
     });
     setQuickExpSaving(false); setQuickExpSaved(true);
@@ -263,13 +278,14 @@ export default function AdminPage() {
   }
 
   function getPaymentMethod(order: Order): "online" | "cash" | "unclassified" {
-    const n = order.notes || "";
-    if (n.includes("online_payment") || n.includes("Bank Transfer") || n.includes("Online")) return "online";
-    if (n.includes("cash_on_delivery") || n.includes("Cash on Delivery")) return "cash";
+    const m = orderPaymentMethod(order);
+    if (m === "bank_transfer" || m === "online_provider") return "online";
+    if (m === "cash_on_delivery" || m === "cash_on_collection") return "cash";
     return "unclassified";
   }
 
   function getFulfilmentDate(order: Order): string | null {
+    if (order.scheduled_fulfilment_date) return order.scheduled_fulfilment_date;
     if (!order.notes) return null;
     const m = order.notes.match(/Day:\s*(Thursday|Friday|Saturday)/i);
     if (!m) return null;
@@ -286,7 +302,7 @@ export default function AdminPage() {
   function exportToPDF() {
     const printWindow = window.open("", "_blank");
     if (!printWindow) return;
-    const prepOrders = orders.filter(o => ["new","confirmed","ready"].includes(o.status));
+    const prepOrders = orders.filter(o => ["new","confirmed","preparing","ready"].includes(o.status));
     const revenue = prepOrders.reduce((s, o) => s + o.total, 0);
     printWindow.document.write(`<!DOCTYPE html><html><head><title>The Club Boils - Orders</title>
     <style>body{font-family:Arial,sans-serif;padding:20px}h1{font-size:24px}.order{border:1px solid #ddd;padding:16px;margin-bottom:12px;border-radius:4px}.summary{background:#f5f5f5;padding:12px;margin-bottom:20px;border-radius:4px}</style></head><body>
@@ -318,7 +334,7 @@ export default function AdminPage() {
   async function markAllComplete() {
     if (!window.confirm("Mark all active orders as completed?")) return;
     setMarkingComplete(true);
-    const activeIds = orders.filter(o => ["new","confirmed","ready"].includes(o.status)).map(o => o.id);
+    const activeIds = orders.filter(o => ["new","confirmed","preparing","ready"].includes(o.status)).map(o => o.id);
     for (const id of activeIds) {
       await supabase.from("orders").update({ status: "completed" }).eq("id", id);
     }
@@ -328,7 +344,7 @@ export default function AdminPage() {
 
   // ── Computed ──────────────────────────────────────────────
   const completedOrders = orders.filter(o => o.status === "completed");
-  const prepOrders      = orders.filter(o => ["new","confirmed","ready"].includes(o.status));
+  const prepOrders      = orders.filter(o => ["new","confirmed","preparing","ready"].includes(o.status));
   const pendingCount    = prepOrders.length;
 
   // This week revenue
@@ -365,34 +381,12 @@ export default function AdminPage() {
     boxSizing: "border-box" as const, backgroundColor: C.white,
   };
 
-  // ── Login ──────────────────────────────────────────────────
+  // ── Session check (sign-in happens on /admin/login) ───────
   if (!authed) {
     return (
-      <>
-        <style>{`${GOOGLE_FONTS} * { box-sizing: border-box; margin: 0; padding: 0; } @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }`}</style>
-        <main style={{ backgroundColor: C.black, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT_BODY, padding: "24px", position: "relative" as const, overflow: "hidden" }}>
-          <div style={{ position: "absolute", top: "20%", left: "50%", transform: "translateX(-50%)", width: "600px", height: "400px", background: "radial-gradient(ellipse, rgba(196,149,42,0.08) 0%, transparent 70%)", pointerEvents: "none" }} />
-          <div style={{ backgroundColor: "rgba(255,255,255,0.03)", backdropFilter: "blur(20px)", borderRadius: "8px", border: `1px solid ${C.border}`, padding: "52px 44px", maxWidth: "420px", width: "100%", textAlign: "center" as const, animation: "fadeUp 0.6s ease both", boxShadow: "0 32px 64px rgba(0,0,0,0.4)" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "12px", marginBottom: "8px" }}>
-              <span style={{ color: C.gold, fontSize: "28px" }}>♣</span>
-              <h1 style={{ fontFamily: FONT_DISPLAY, fontSize: "22px", fontWeight: "600", color: C.white, letterSpacing: "0.06em" }}>THE CLUB BOILS</h1>
-            </div>
-            <p style={{ fontSize: "10px", fontWeight: "700", letterSpacing: "0.22em", textTransform: "uppercase" as const, color: C.gold, marginBottom: "40px" }}>Admin Dashboard</p>
-            <div style={{ textAlign: "left" as const, marginBottom: "16px" }}>
-              <label style={{ fontSize: "10px", fontWeight: "700", letterSpacing: "0.14em", textTransform: "uppercase" as const, color: C.muted, display: "block", marginBottom: "8px" }}>Password</label>
-              <input type="password" value={pwInput} onChange={e => { setPwInput(e.target.value); setPwError(false); }}
-                onKeyDown={e => e.key === "Enter" && (() => { if (pwInput === PASSWORD) { setAuthed(true); setPwError(false); } else setPwError(true); })()}
-                placeholder="Enter password"
-                style={{ ...inputStyle, backgroundColor: "rgba(255,255,255,0.05)", border: pwError ? "1px solid #C0392B" : `1px solid ${C.border}`, color: C.white }} />
-              {pwError && <p style={{ color: "#C0392B", fontSize: "12px", marginTop: "6px" }}>Incorrect password.</p>}
-            </div>
-            <button onClick={() => { if (pwInput === PASSWORD) { setAuthed(true); setPwError(false); } else setPwError(true); }}
-              style={{ background: `linear-gradient(135deg, ${C.gold}, #E8B84B)`, color: C.black, width: "100%", padding: "14px", borderRadius: "4px", border: "none", fontFamily: FONT_BODY, fontWeight: "700", fontSize: "12px", letterSpacing: "0.12em", cursor: "pointer", textTransform: "uppercase" as const }}>
-              Sign In
-            </button>
-          </div>
-        </main>
-      </>
+      <main style={{ backgroundColor: C.black, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT_BODY, color: C.gold, fontSize: "12px", letterSpacing: "0.2em" }}>
+        LOADING…
+      </main>
     );
   }
 
@@ -420,9 +414,10 @@ export default function AdminPage() {
             <span style={{ fontSize: "9px", fontWeight: "700", letterSpacing: "0.16em", color: C.gold, textTransform: "uppercase" as const, backgroundColor: "rgba(196,149,42,0.15)", padding: "3px 10px", borderRadius: "20px" }}>Admin</span>
           </div>
           <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+            <a href="/admin/events" style={{ border: `1px solid ${C.border}`, color: C.gold, padding: "7px 16px", borderRadius: "4px", fontSize: "11px", fontFamily: FONT_BODY, textDecoration: "none", letterSpacing: "0.06em", fontWeight: "600" }}>🎓 School Events</a>
             <a href="/accounts" style={{ border: `1px solid ${C.border}`, color: C.gold, padding: "7px 16px", borderRadius: "4px", fontSize: "11px", fontFamily: FONT_BODY, textDecoration: "none", letterSpacing: "0.06em", fontWeight: "600" }}>📊 Accounts</a>
             <button onClick={fetchOrders} style={{ backgroundColor: "transparent", border: `1px solid ${C.border}`, color: "rgba(255,255,255,0.5)", padding: "7px 16px", borderRadius: "4px", cursor: "pointer", fontSize: "11px", fontFamily: FONT_BODY }}>↻ Refresh</button>
-            <button onClick={() => setAuthed(false)} style={{ backgroundColor: "transparent", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.3)", padding: "7px 16px", borderRadius: "4px", cursor: "pointer", fontSize: "11px", fontFamily: FONT_BODY }}>Sign Out</button>
+            <button onClick={adminSignOut} title={adminEmail} style={{ backgroundColor: "transparent", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.3)", padding: "7px 16px", borderRadius: "4px", cursor: "pointer", fontSize: "11px", fontFamily: FONT_BODY }}>Sign Out</button>
           </div>
         </header>
 
@@ -434,7 +429,7 @@ export default function AdminPage() {
             const dow = now.getDay(); const daysBack = dow === 0 ? 6 : dow - 1;
             const wStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysBack, 0, 0, 0);
             const wEnd   = new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysBack + 6, 23, 59, 59);
-            const thisWeekExpected = orders.filter(o => ["new","confirmed","ready"].includes(o.status)).filter(o => {
+            const thisWeekExpected = orders.filter(o => ["new","confirmed","preparing","ready"].includes(o.status)).filter(o => {
               const fd = getFulfilmentDate(o); if (!fd) return false;
               const d = new Date(fd + "T12:00:00-04:00"); return d >= wStart && d <= wEnd;
             }).reduce((s, o) => s + o.total, 0);
@@ -775,7 +770,7 @@ export default function AdminPage() {
                         📅 {order.notes.match(/Day: (\w+)/)?.[1] || ""}
                       </span>
                     )}
-                    <span style={{ fontSize: "13px", color: C.muted, whiteSpace: "nowrap" as const }}>{order.fulfillment === "delivery" ? "🚗 Delivery" : "🏠 Pickup"}</span>
+                    <span style={{ fontSize: "13px", color: C.muted, whiteSpace: "nowrap" as const }}>{order.school_event_id ? "🎓 School Event" : order.fulfillment === "delivery" ? "🚗 Delivery" : "🏠 Pickup"}</span>
                     <span style={{ fontFamily: FONT_DISPLAY, fontSize: "17px", color: C.black, whiteSpace: "nowrap" as const }}>TT${order.total}</span>
                     <span style={{ color: C.muted, fontSize: "18px" }}>{isExpanded2 ? "▲" : "▼"}</span>
                   </div>
@@ -787,7 +782,9 @@ export default function AdminPage() {
                         {order.address && <p><strong>Address:</strong> {order.address}</p>}
                         {(order.details || []).map((d, i) => <p key={i} style={{ color: C.charcoal }}>· {d}</p>)}
                         {order.notes && <p style={{ backgroundColor: "#FFFBE6", border: "1px solid #F0C04A", borderRadius: "4px", padding: "8px 12px", marginTop: "4px" }}>{order.notes}</p>}
+                        {order.order_number && <p style={{ color: C.muted }}>Order #{order.order_number}{order.programme_or_cohort ? ` · ${order.programme_or_cohort}` : ""}</p>}
                       </div>
+                      <PaymentPanel order={order} onChanged={fetchOrders} />
                       <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" as const, marginBottom: editingOrder === order.id ? "16px" : "0" }}>
                         {editingOrder !== order.id && (
                           <button onClick={() => startEdit(order)} style={{ backgroundColor: C.white, color: C.charcoal, padding: "9px 18px", borderRadius: "4px", border: `1px solid ${C.border}`, fontFamily: FONT_BODY, fontWeight: "600", fontSize: "12px", cursor: "pointer" }}>✏️ Edit Order</button>
@@ -1059,7 +1056,7 @@ export default function AdminPage() {
                                         📅 {order.notes.match(/Day: (\w+)/)?.[1] || ""}
                                       </span>
                                     )}
-                                    <span style={{ fontSize: "13px", color: C.muted, whiteSpace: "nowrap" as const }}>{order.fulfillment === "delivery" ? "🚗 Delivery" : "🏠 Pickup"}</span>
+                                    <span style={{ fontSize: "13px", color: C.muted, whiteSpace: "nowrap" as const }}>{order.school_event_id ? "🎓 School Event" : order.fulfillment === "delivery" ? "🚗 Delivery" : "🏠 Pickup"}</span>
                                     <span style={{ fontFamily: FONT_DISPLAY, fontSize: "17px", color: C.black, whiteSpace: "nowrap" as const }}>TT${order.total}</span>
                                     <span style={{ color: C.muted, fontSize: "18px" }}>{isExpanded2 ? "▲" : "▼"}</span>
                                   </div>
@@ -1071,7 +1068,9 @@ export default function AdminPage() {
                                         {order.address && <p><strong>Address:</strong> {order.address}</p>}
                                         {(order.details || []).map((d, i) => <p key={i} style={{ color: C.charcoal }}>· {d}</p>)}
                                         {order.notes && <p style={{ backgroundColor: "#FFFBE6", border: "1px solid #F0C04A", borderRadius: "4px", padding: "8px 12px", marginTop: "4px" }}>{order.notes}</p>}
+                                        {order.order_number && <p style={{ color: C.muted }}>Order #{order.order_number}{order.programme_or_cohort ? ` · ${order.programme_or_cohort}` : ""}</p>}
                                       </div>
+                                      <PaymentPanel order={order} onChanged={fetchOrders} />
                                       <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" as const, marginBottom: editingOrder === order.id ? "16px" : "0" }}>
                                         {editingOrder !== order.id && (
                                           <button onClick={() => startEdit(order)} style={{ backgroundColor: C.white, color: C.charcoal, padding: "9px 18px", borderRadius: "4px", border: `1px solid ${C.border}`, fontFamily: FONT_BODY, fontWeight: "600", fontSize: "12px", cursor: "pointer" }}>✏️ Edit Order</button>

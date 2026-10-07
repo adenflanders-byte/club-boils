@@ -10,7 +10,7 @@ create table if not exists public.orders (
   email text,
   package text,
   details text[],
-  fulfillment text,
+  fulfillment text check (fulfillment in ('delivery','pickup')),
   address text,
   notes text,
   total integer not null default 0,
