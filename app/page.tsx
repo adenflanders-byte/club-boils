@@ -1,6 +1,12 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import {
+  SEAFOOD, DUO_SEAFOOD, EXTRAS, DUO_EXTRAS, ADDON_EXTRAS, HEATS, SOLO_OPTIONS, DUO_OPTIONS, SIMPLE_ITEMS,
+  LOBSTER_PRODUCTS, BUILD_BASE, DELIVERY_FEE, type LineInput,
+} from "@/lib/menu";
+import { BANK_DETAILS } from "@/lib/payments";
+import { EAST_AREAS, REVIEW_AREAS } from "@/lib/areas";
 
 type Heat = "mild" | "medium" | "hot" | "";
 
@@ -18,116 +24,13 @@ interface CartItem {
   quantity: number;
   extras?: ExtraItem[];
   basePrice?: number;
+  /** What the server needs to price this item (ids and options only). */
+  line: Omit<LineInput, "quantity">;
 }
 
-const SEAFOOD = [
-  { id: "shrimp",  emoji: "🦐", label: "Shrimp",         desc: "6 shrimp",            price: 30 },
-  { id: "crab",    emoji: "🦀", label: "Snow Crab",       desc: "1 portion",           price: 50 },
-  { id: "mussels", emoji: "🐚", label: "Mussels",         desc: "1 portion",           price: 10 },
-  { id: "squid",   emoji: "🐙", label: "Squid & Octopus", desc: "1 portion",           price: 20 },
-  { id: "clams",   emoji: "🐌", label: "Clams",           desc: "1 portion",           price: 10 },
-];
-const DUO_SEAFOOD = [
-  { id: "shrimp",  emoji: "🦐", label: "Shrimp",         desc: "12 shrimp",           price: 60  },
-  { id: "crab",    emoji: "🦀", label: "Snow Crab",       desc: "2 portions",          price: 100 },
-  { id: "mussels", emoji: "🐚", label: "Mussels",         desc: "2 portions",          price: 20  },
-  { id: "squid",   emoji: "🐙", label: "Squid & Octopus", desc: "2 portions",          price: 40  },
-  { id: "clams",   emoji: "🐌", label: "Clams",           desc: "2 portions",          price: 20  },
-];
-const EXTRAS = [
-  { id: "eggs",     emoji: "🥚", label: "Eggs",           desc: "2 pieces",  price: 5  },
-  { id: "sausage",  emoji: "🌭", label: "Sausage",        desc: "1 portion", price: 10 },
-  { id: "corn",     emoji: "🌽", label: "Extra Corn",     desc: "1 portion", price: 5  },
-  { id: "potatoes", emoji: "🥔", label: "Extra Potatoes", desc: "1 portion", price: 5  },
-];
-const DUO_EXTRAS = [
-  { id: "eggs",     emoji: "🥚", label: "Eggs",           desc: "4 pieces",  price: 10 },
-  { id: "sausage",  emoji: "🌭", label: "Sausage",        desc: "2 portions",price: 20 },
-  { id: "corn",     emoji: "🌽", label: "Extra Corn",     desc: "2 portions",price: 10 },
-  { id: "potatoes", emoji: "🥔", label: "Extra Potatoes", desc: "2 portions",price: 10 },
-];
-// NOTE: Specialty Butter Sauce is INCLUDED with all seafood boils — not a paid extra
-const ADDON_EXTRAS = [
-  { id: "extra_shrimp",  emoji: "🦐", label: "Extra Shrimp",    desc: "one portion",              unitPrice: 30 },
-  { id: "extra_crab",    emoji: "🦀", label: "Extra Snow Crab", desc: "one portion",              unitPrice: 50 },
-  { id: "extra_egg",     emoji: "🥚", label: "Extra Egg",       desc: "one portion",              unitPrice: 5  },
-  { id: "extra_clams",   emoji: "🐚", label: "Extra Clams",     desc: "one portion (3–5 pieces)", unitPrice: 25 },
-  { id: "extra_mussels", emoji: "🦪", label: "Extra Mussels",   desc: "one portion (3–5 pieces)", unitPrice: 25 },
-  { id: "extra_sausage", emoji: "🌭", label: "Extra Sausage",   desc: "one portion",              unitPrice: 15 },
-  { id: "extra_corn",    emoji: "🌽", label: "Extra Corn",      desc: "one portion (3–5 pieces)", unitPrice: 20 },
-  { id: "extra_potato",  emoji: "🥔", label: "Extra Potatoes",  desc: "one extra portion",        unitPrice: 20 },
-  { id: "pepper_sauce",  emoji: "🌶️", label: "Pepper Sauce",   desc: "one portion",              unitPrice: 10 },
-];
-
-const HEATS = [
-  { id: "mild",   label: "Mild",   emoji: "😊" },
-  { id: "medium", label: "Medium", emoji: "🌶️" },
-  { id: "hot",    label: "Hot",    emoji: "🔥" },
-];
-const SOLO_OPTIONS = [
-  { id: "solo-shrimp", label: "Shrimp",             price: 130 },
-  { id: "solo-crab",   label: "Snow Crab",           price: 130 },
-  { id: "solo-mix",    label: "Mix (Shrimp + Crab)", price: 160 },
-];
-const DUO_OPTIONS = [
-  { id: "duo-shrimp", label: "Shrimp",             price: 280 },
-  { id: "duo-crab",   label: "Snow Crab",           price: 280 },
-  { id: "duo-mix",    label: "Mix (Shrimp + Crab)", price: 320 },
-];
-const SIMPLE_ITEMS = [
-  { id: "ramen", name: "Shrimp Alfredo Ramen Boil", desc: "Shrimp, ramen noodles, homemade Alfredo sauce, sausage, boiled egg & corn", price: 100, image: "/ramen2.jpeg", tag: "Fan Favourite" },
-  { id: "wings", name: "Wings Boil", desc: "6-8 wings tossed in our signature specialty butter sauce", price: 80, image: "/wings2.jpeg", tag: null },
-  { id: "sauce", name: "Pepper Sauce", desc: "Homemade Lime Pepper Sauce — optional add-on", price: 10, image: null, tag: null },
-  { id: "combo", name: "Club Ramen Wings Combo", desc: "Shrimp Alfredo Ramen Boil + Wings Boil — the ultimate combo", price: 120, image: "/wings2.jpeg", tag: "New" },
-];
-
-const LOBSTER_PRODUCTS = [
-  {
-    id: "lobster_half",
-    name: "Half Lobster Boil",
-    desc: "½ lobster, sausage, boiled egg, clams, mussels, octopi, squid, corn, potatoes & House Butter Sauce",
-    soloPrice: 260, duoPrice: 360,
-    soloPortions: "½ lobster", duoPortions: "½ lobster (larger serving)",
-  },
-  {
-    id: "lobster_whole",
-    name: "Whole Lobster Boil",
-    desc: "1 whole lobster, sausage, boiled egg, clams, mussels, octopi, squid, corn, potatoes & House Butter Sauce",
-    soloPrice: 360, duoPrice: 550,
-    soloPortions: "1 whole lobster", duoPortions: "1 whole lobster (larger serving)",
-  },
-  {
-    id: "lobster_shrimp_half",
-    name: "Shrimp & Half Lobster Boil",
-    desc: "½ lobster, shrimp, sausage, boiled egg, clams, mussels, octopi, squid, corn, potatoes & House Butter Sauce",
-    soloPrice: 290, duoPrice: 460,
-    soloPortions: "½ lobster + 6 shrimp", duoPortions: "½ lobster + 12 shrimp",
-  },
-  {
-    id: "lobster_shrimp_whole",
-    name: "Shrimp & Whole Lobster Boil",
-    desc: "1 whole lobster, shrimp, sausage, boiled egg, clams, mussels, octopi, squid, corn, potatoes & House Butter Sauce",
-    soloPrice: 390, duoPrice: 610,
-    soloPortions: "1 whole lobster + 6 shrimp", duoPortions: "1 whole lobster + 12 shrimp",
-  },
-  {
-    id: "lobster_loaded_half",
-    name: "Loaded Half Lobster Boil",
-    desc: "½ lobster, shrimp, snow crab, sausage, boiled egg, clams, mussels, octopi, squid, corn, potatoes & House Butter Sauce",
-    soloPrice: 340, duoPrice: 560,
-    soloPortions: "½ lobster + shrimp + snow crab", duoPortions: "½ lobster + shrimp + snow crab (larger serving)",
-  },
-  {
-    id: "lobster_loaded_whole",
-    name: "Loaded Whole Lobster Boil",
-    desc: "1 whole lobster, shrimp, snow crab, sausage, boiled egg, clams, mussels, octopi, squid, corn, potatoes & House Butter Sauce",
-    soloPrice: 440, duoPrice: 710,
-    soloPortions: "1 whole lobster + shrimp + snow crab", duoPortions: "1 whole lobster + shrimp + snow crab (larger serving)",
-  },
-];
-
-const BASE = 60;
-const DELIVERY_FEE = 30;
+// Menu items and prices live in lib/menu.ts (shared with school events and
+// the server checkout, which recalculates every price).
+const BASE = BUILD_BASE.solo;
 
 export default function Home() {
   const menuRef = useRef<HTMLDivElement>(null);
@@ -138,6 +41,8 @@ export default function Home() {
   const [submitted,   setSubmitted]   = useState(false);
   const [submitting,  setSubmitting]  = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const [orderNumber, setOrderNumber] = useState("");
+  const [checkoutKey, setCheckoutKey] = useState("");
   const [showBuild,    setShowBuild]    = useState(false);
 
   // Extras customizer state
@@ -164,6 +69,8 @@ export default function Home() {
     const extrasDesc = activeExtras.length > 0
       ? " + " + activeExtras.map(e => `${e.qty}x ${e.label}`).join(", ")
       : "";
+    // "solo-shrimp" → "solo_shrimp", "lobster_half-duo" → "lobster_half_duo"
+    const itemId = customizerItem.id.replace(/^(solo|duo)-/, "$1_").replace(/-(solo|duo)$/, "_$1");
     addToCart({
       id: `${customizerItem.id}-${Date.now()}`,
       name: customizerItem.name,
@@ -171,6 +78,7 @@ export default function Home() {
       price: customizerTotal(),
       basePrice: customizerItem.basePrice,
       extras: activeExtras,
+      line: { itemId, addons: Object.fromEntries(activeExtras.map(e => [e.id, e.qty])) },
     });
     closeCustomizer();
   }
@@ -185,13 +93,10 @@ export default function Home() {
   const [fulfillment, setFulfillment] = useState<"delivery" | "pickup" | "">("");
   const [paymentMethod,  setPaymentMethod]  = useState<"bank" | "cash" | "">("");
   const [deliveryArea,   setDeliveryArea]   = useState("");
+  const [deliveryAcknowledged, setDeliveryAcknowledged] = useState(false);
 
   // Approved East Trinidad delivery areas
-  const EAST_AREAS = ["Arima","Arouca","Curepe","D'Abadie","La Horquetta","Maloney","Piarco","St. Augustine","Tacarigua","Trincity","Tunapuna","Valencia"];
-  const REVIEW_AREAS = ["Other East area — request confirmation"];
-  const BLOCKED_AREAS = ["Port of Spain","San Fernando","Chaguanas","Marabella","Point Fortin","Siparia","Penal","Debe","Couva","Fyzabad","Princes Town","Rio Claro","Mayaro","Tobago"];
   const [orderDay, setOrderDay] = useState<"thursday" | "friday" | "saturday" | "">("");
-  const [selectedFulfilmentDate, setSelectedFulfilmentDate] = useState<string>("");
   const [openDays, setOpenDays] = useState({ thursday: true, friday: true, saturday: false });
   const [name,    setName]    = useState("");
   const [phone,   setPhone]   = useState("");
@@ -368,7 +273,12 @@ export default function Home() {
     }));
   }
 
+  function newCheckoutKey() {
+    const b = new Uint8Array(18); crypto.getRandomValues(b);
+    return Array.from(b, x => x.toString(16).padStart(2, "0")).join("");
+  }
   function addToCart(item: Omit<CartItem, "quantity">) {
+    setCheckoutKey(""); // a changed cart is a new order attempt
     setCart(prev => {
       const existing = prev.find(c => c.id === item.id && c.description === item.description);
       if (existing) return prev.map(c => c.id === item.id && c.description === item.description ? { ...c, quantity: c.quantity + 1 } : c);
@@ -377,6 +287,7 @@ export default function Home() {
     setShowCart(true);
   }
   function removeFromCart(idx: number) {
+    setCheckoutKey("");
     setCart(prev => {
       const updated = [...prev];
       if (updated[idx].quantity > 1) updated[idx] = { ...updated[idx], quantity: updated[idx].quantity - 1 };
@@ -393,7 +304,7 @@ export default function Home() {
   function toggleDuoBuildSeafood(id: string) { setDuoBuildSeafood(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]); }
   function toggleDuoBuildExtra(id: string)   { setDuoBuildExtras(prev  => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]); }
   function toggleBuildExtra(id: string)   { setBuildExtras(prev  => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]); }
-  const DUO_BASE = 100;
+  const DUO_BASE = BUILD_BASE.duo;
 
   function calcDuoBuildPrice(s: string[], e: string[]) {
     return DUO_BASE
@@ -408,7 +319,8 @@ export default function Home() {
     const extraLabels   = duoBuildExtras.map(id  => DUO_EXTRAS.find(x  => x.id === id)?.label).join(", ");
     const heatLabel     = HEATS.find(h => h.id === duoBuildHeat)?.label ?? "";
     const desc = `${seafoodLabels}${extraLabels ? ` + ${extraLabels}` : ""} - ${heatLabel} (Duo)`;
-    addToCart({ id: `duo-build-${Date.now()}`, name: "Build Your Own Boil (Duo)", description: desc, price: calcDuoBuildPrice(duoBuildSeafood, duoBuildExtras) });
+    addToCart({ id: `duo-build-${Date.now()}`, name: "Build Your Own Boil (Duo)", description: desc, price: calcDuoBuildPrice(duoBuildSeafood, duoBuildExtras),
+      line: { itemId: "build_duo", seafood: duoBuildSeafood, extras: duoBuildExtras, heat: duoBuildHeat } });
     setDuoBuildSeafood([]); setDuoBuildExtras([]); setDuoBuildHeat(""); setShowDuoBuild(false);
   }
 
@@ -418,7 +330,8 @@ export default function Home() {
     const seafoodLabels = buildSeafood.map(id => SEAFOOD.find(x => x.id === id)?.label).join(", ");
     const extraLabels   = buildExtras.map(id  => EXTRAS.find(x  => x.id === id)?.label).join(", ");
     const heatLabel     = HEATS.find(h => h.id === buildHeat)?.label ?? "";
-    addToCart({ id: `build-${Date.now()}`, name: "Build Your Own Boil", description: `${seafoodLabels}${extraLabels ? ` + ${extraLabels}` : ""} - ${heatLabel}`, price: calcBuildPrice(buildSeafood, buildExtras) });
+    addToCart({ id: `build-${Date.now()}`, name: "Build Your Own Boil", description: `${seafoodLabels}${extraLabels ? ` + ${extraLabels}` : ""} - ${heatLabel}`, price: calcBuildPrice(buildSeafood, buildExtras),
+      line: { itemId: "build_solo", seafood: buildSeafood, extras: buildExtras, heat: buildHeat } });
     setBuildSeafood([]); setBuildExtras([]); setBuildHeat(""); setShowBuild(false);
   }
   function revealMenu() {
@@ -426,26 +339,36 @@ export default function Home() {
     setTimeout(() => { menuRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }, 100);
   }
   async function handleSubmit() {
-    if (!name.trim() || !phone.trim())                 { alert("Please fill in your name and phone number."); return; }
-    if (!fulfillment)                                  { alert("Please choose delivery or pickup."); return; }
-    if (fulfillment === "delivery" && !address.trim()) { alert("Please enter your delivery address."); return; }
-    if (cart.length === 0)                             { alert("Your cart is empty!"); return; }
-    if (!paymentMethod)                                { alert("Please choose a payment method."); return; }
-    if (!orderDay || !selectedFulfilmentDate) { alert("Please choose which day you are ordering for."); return; }
+    if (!name.trim() || !phone.trim())                               { alert("Please fill in your name and phone number."); return; }
+    if (!fulfillment)                                                { alert("Please choose delivery or pickup."); return; }
+    if (fulfillment === "delivery" && !address.trim())               { alert("Please enter your delivery address."); return; }
+    if (fulfillment === "delivery" && !deliveryAcknowledged)         { alert("Please acknowledge the delivery window before placing your order."); return; }
+    if (cart.length === 0)                                           { alert("Your cart is empty!"); return; }
+    if (!paymentMethod)                                              { alert("Please choose a payment method."); return; }
+    if (!orderDay)                                     { alert("Please choose which day you are ordering for."); return; }
     setSubmitting(true); setSubmitError("");
-    const details = cart.map(item => `${item.quantity}x ${item.name} (${item.description}) - TT$${item.price * item.quantity}`);
-    const { error } = await supabase.from("orders").insert({
-      name: name.trim(), phone: phone.trim(), email: email.trim() || null,
-      package: cart.map(i => `${i.quantity}x ${i.name}`).join(", "),
-      details, fulfillment,
-      address: fulfillment === "delivery" ? address.trim() : null,
-      notes: (notes.trim() ? notes.trim() + "\n" : "") + "Payment: " + (paymentMethod === "bank" ? "online_payment" : "cash_on_delivery") + "\nDay: " + orderDay.charAt(0).toUpperCase() + orderDay.slice(1) + (deliveryArea ? "\nArea: " + deliveryArea : ""),
-      fulfilment_date: selectedFulfilmentDate,
-      total: totalPrice, status: "new",
-    });
+    // One key per checkout: retries and double-taps can never create two orders.
+    const key = checkoutKey || newCheckoutKey();
+    if (!checkoutKey) setCheckoutKey(key);
+    const heatLabel = notes.match(/Heat:\s*(Mild|Medium|Hot)/)?.[1];
+    try {
+      const res = await fetch("/api/orders", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name, phone, email, notes, fulfillment, address, deliveryArea, deliveryAcknowledged,
+          paymentMethod: paymentMethod === "bank" ? "bank_transfer" : "cash_on_delivery",
+          orderDay, heat: heatLabel?.toLowerCase(),
+          lines: cart.map(item => ({ ...item.line, quantity: item.quantity })),
+          expectedTotal: totalPrice, idempotencyKey: key,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { setSubmitError(data.error || "Something went wrong. Please call us at 868-293-0570."); }
+      else { setOrderNumber(data.order?.orderNumber || ""); setSubmitted(true); setShowCart(false); setCheckoutKey(""); }
+    } catch {
+      setSubmitError("Could not reach the server. Check your connection and try again — you will not be charged twice.");
+    }
     setSubmitting(false);
-    if (error) { setSubmitError("Something went wrong. Please call us at 868-293-0570."); }
-    else { setSubmitted(true); setShowCart(false); }
   }
 
   const cartTotal  = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
@@ -976,7 +899,7 @@ export default function Home() {
                         <p style={{ fontSize: "12px", color: muted, marginBottom: "12px", lineHeight: 1.6 }}>{item.desc}</p>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                           <p style={{ fontFamily: "'Cinzel', serif", fontSize: "20px", color: gold, fontWeight: "600" }}>TT${item.price}</p>
-                          <button className="add-btn" onClick={() => ordersOpen && addToCart({ id: item.id, name: item.name, description: item.desc, price: item.price })} style={{ ...addBtn, opacity: ordersOpen ? 1 : 0.4 }} disabled={!ordersOpen}>+ Add</button>
+                          <button className="add-btn" onClick={() => ordersOpen && addToCart({ id: item.id, name: item.name, description: item.desc, price: item.price, line: { itemId: item.id } })} style={{ ...addBtn, opacity: ordersOpen ? 1 : 0.4 }} disabled={!ordersOpen}>+ Add</button>
                         </div>
                       </div>
                     </div>
@@ -1159,10 +1082,7 @@ export default function Home() {
                   </div>
 
                   {/* Extras */}
-                  <p style={{ fontFamily: "'Inter', sans-serif", fontSize: "10px", fontWeight: "700", letterSpacing: "0.14em", textTransform: "uppercase" as const, color: muted, marginBottom: "8px" }}>Add Extras (Optional)</p>
-                  <div style={{ backgroundColor: "rgba(196,149,42,0.06)", border: `1px solid ${border}`, borderRadius: "4px", padding: "8px 12px", marginBottom: "12px", fontSize: "11px", color: muted }}>
-                    🧈 <strong style={{ color: charcoal }}>Specialty Butter Sauce included</strong> with all seafood boils.
-                  </div>
+                  <p style={{ fontFamily: "'Inter', sans-serif", fontSize: "10px", fontWeight: "700", letterSpacing: "0.14em", textTransform: "uppercase" as const, color: muted, marginBottom: "12px" }}>Add Extras (Optional)</p>
                   <div style={{ display: "grid", gap: "8px", marginBottom: "24px" }}>
                     {ADDON_EXTRAS.map(extra => {
                       const qty = customizerExtras[extra.id] || 0;
@@ -1172,7 +1092,7 @@ export default function Home() {
                             <span style={{ fontSize: "20px" }}>{extra.emoji}</span>
                             <div>
                               <p style={{ fontSize: "13px", fontWeight: "500", color: charcoal }}>{extra.label}</p>
-                              <p style={{ fontSize: "11px", color: muted }}>{(extra as any).desc} · TT${extra.unitPrice}</p>
+                              <p style={{ fontSize: "11px", color: muted }}>TT${extra.unitPrice} each</p>
                             </div>
                           </div>
                           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
@@ -1251,15 +1171,25 @@ export default function Home() {
                 <div>
                   <label style={labelStyle}>Delivery or Pickup? *</label>
                   <div style={{ display: "flex", gap: "10px" }}>
-                    <button onClick={() => setFulfillment("pickup")}   style={fulfillBtn("pickup")}>🏠 Pickup</button>
+                    <button onClick={() => { setFulfillment("pickup"); setDeliveryAcknowledged(false); }}   style={fulfillBtn("pickup")}>🏠 Pickup</button>
                     <button onClick={() => setFulfillment("delivery")} style={fulfillBtn("delivery")}>🚗 Delivery (+TT$30)</button>
                   </div>
                 </div>
+                {fulfillment === "pickup" && (
+                  <div style={{ backgroundColor: "#EAFFF0", border: "1px solid #8FD4A0", borderRadius: "4px", padding: "12px 16px", marginTop: "10px" }}>
+                    <p style={{ fontSize: "12px", color: "#1A7A3A", lineHeight: 1.6 }}>🏠 <strong>Pickup begins at 11:30 AM</strong> in Arima. Please arrive during our operating window (11:30 AM – 6:00 PM).</p>
+                  </div>
+                )}
                 {fulfillment === "delivery" && (
                 <div>
+                  {/* Delivery window notice */}
+                  <div style={{ backgroundColor: "#EBF3FF", border: "1px solid #B8D4F5", borderRadius: "4px", padding: "14px 16px", marginBottom: "12px" }}>
+                    <p style={{ fontSize: "11px", fontWeight: "700", color: "#1A56A4", letterSpacing: "0.08em", textTransform: "uppercase" as const, marginBottom: "6px" }}>🚗 Delivery Window</p>
+                    <p style={{ fontSize: "12px", color: "#1A56A4", lineHeight: 1.7 }}>Deliveries begin at <strong>11:30 AM</strong> and may arrive at any time between <strong>11:30 AM and 6:00 PM</strong>. A lunchtime delivery is not guaranteed. Please ensure you are available to receive your order during this window.</p>
+                  </div>
                   {/* East-only delivery notice */}
                   <div style={{ backgroundColor: "#FFF8EC", border: "1px solid #F0C04A", borderRadius: "4px", padding: "12px 16px", marginBottom: "12px" }}>
-                    <p style={{ fontSize: "11px", fontWeight: "700", color: "#B8600A", letterSpacing: "0.08em", textTransform: "uppercase" as const, marginBottom: "4px" }}>⚠️ Delivery Notice</p>
+                    <p style={{ fontSize: "11px", fontWeight: "700", color: "#B8600A", letterSpacing: "0.08em", textTransform: "uppercase" as const, marginBottom: "4px" }}>⚠️ Area Notice</p>
                     <p style={{ fontSize: "12px", color: "#B8600A", lineHeight: 1.6 }}>Delivery is currently available to East Trinidad only. If your area is outside the East, please select Pickup in Arima. If you are unsure, <a href="https://wa.me/18682930570" target="_blank" rel="noopener noreferrer" style={{ color: "#B8600A", fontWeight: "700" }}>contact us</a> before placing your order.</p>
                   </div>
                   <label style={labelStyle}>Delivery Area *</label>
@@ -1308,78 +1238,39 @@ export default function Home() {
                     <p style={{ fontFamily: "'Cinzel', serif", fontSize: "24px", color: gold }}>TT${totalPrice}</p>
                   </div>
                 </div>
-                {/* Order Day — this week + next week */}
+                {/* Order Day */}
                 <div>
                   <label style={labelStyle}>Which Day Are You Ordering For? *</label>
-                  {(() => {
-                    const nowUTC = new Date();
-                    const nowTT = new Date(nowUTC.toLocaleString("en-US", { timeZone: "America/Port_of_Spain" }));
-                    function getMondayOf(d: Date): Date {
-                      const dow = d.getDay();
-                      const diff = dow === 0 ? -6 : 1 - dow;
-                      const monday = new Date(d);
-                      monday.setDate(d.getDate() + diff);
-                      monday.setHours(0, 0, 0, 0);
-                      return monday;
-                    }
-                    const thisMonday = getMondayOf(nowTT);
-                    type DayKey = "thursday" | "friday" | "saturday";
-                    const dayNames: Record<number, DayKey> = { 4: "thursday", 5: "friday", 6: "saturday" };
-                    const dayLabels: Record<number, string> = { 4: "Thursday", 5: "Friday", 6: "Saturday" };
-                    const slots: { iso: string; dayName: DayKey; label: string; weekLabel: string; isPast: boolean }[] = [];
-                    for (let weekOffset = 0; weekOffset <= 1; weekOffset++) {
-                      const weekLabel = weekOffset === 0 ? "This Week" : "Next Week";
-                      [4, 5, 6].forEach(dow => {
-                        const slot = new Date(thisMonday);
-                        slot.setDate(thisMonday.getDate() + (weekOffset * 7) + (dow - 1));
-                        const isoDate = slot.toISOString().split("T")[0];
-                        const cutoff = new Date(slot);
-                        cutoff.setDate(slot.getDate() - 1);
-                        cutoff.setHours(20, 0, 0, 0);
-                        const cutoffUTC = new Date(cutoff.getTime() + 4 * 60 * 60 * 1000);
-                        const isPast = new Date() > cutoffUTC || !openDays[dayNames[dow]];
-                        slots.push({ iso: isoDate, dayName: dayNames[dow], label: dayLabels[dow], weekLabel, isPast });
-                      });
-                    }
-                    const groups = [{ label: "This Week", slots: slots.slice(0, 3) }, { label: "Next Week", slots: slots.slice(3, 6) }];
-                    return (
-                      <div>
-                        {groups.map(group => (
-                          <div key={group.label} style={{ marginBottom: "12px" }}>
-                            <p style={{ fontSize: "9px", fontWeight: "700", letterSpacing: "0.14em", textTransform: "uppercase" as const, color: muted, marginBottom: "6px" }}>{group.label}</p>
-                            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px" }}>
-                              {group.slots.map(slot => {
-                                const isSelected = selectedFulfilmentDate === slot.iso;
-                                const isNextUp = timeLeft.fulfilmentDate === slot.iso;
-                                const displayDate = new Date(slot.iso + "T12:00:00-04:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
-                                return (
-                                  <button
-                                    key={slot.iso}
-                                    onClick={() => { if (!slot.isPast) { setSelectedFulfilmentDate(slot.iso); setOrderDay(slot.dayName); } }}
-                                    disabled={slot.isPast}
-                                    style={{
-                                      padding: "12px 6px", borderRadius: "2px", cursor: slot.isPast ? "not-allowed" : "pointer",
-                                      border: isSelected ? `1px solid ${gold}` : isNextUp ? `1px solid ${gold}` : `1px solid ${border}`,
-                                      backgroundColor: slot.isPast ? "rgba(0,0,0,0.04)" : isSelected ? goldDim : isNextUp ? "rgba(196,149,42,0.05)" : "transparent",
-                                      fontFamily: "'Inter', sans-serif", fontSize: "13px",
-                                      fontWeight: isSelected ? "700" : "400",
-                                      color: slot.isPast ? muted : isSelected ? gold : isNextUp ? gold : muted,
-                                      opacity: slot.isPast ? 0.45 : 1, transition: "all 0.2s", textAlign: "center" as const,
-                                    }}
-                                  >
-                                    <span style={{ display: "block" }}>{slot.label}</span>
-                                    <span style={{ display: "block", fontSize: "10px", marginTop: "2px", fontWeight: "400" }}>{displayDate}</span>
-                                    {slot.isPast && <span style={{ display: "block", fontSize: "9px", marginTop: "1px" }}>Closed</span>}
-                                    {isNextUp && !isSelected && !slot.isPast && <span style={{ display: "block", fontSize: "9px", marginTop: "2px", color: gold, fontWeight: "700", letterSpacing: "0.08em" }}>NEXT OPEN</span>}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    );
-                  })()}
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px" }}>
+                    {[
+                      { id: "thursday", label: "Thursday" },
+                      { id: "friday",   label: "Friday"   },
+                      { id: "saturday", label: "Saturday" },
+                    ].map(day => {
+                      const isOpen = openDays[day.id as keyof typeof openDays];
+                      const isRecommended = timeLeft.orderDay?.toLowerCase() === day.id;
+                      return (
+                        <button
+                          key={day.id}
+                          onClick={() => isOpen && setOrderDay(day.id as any)}
+                          disabled={!isOpen}
+                          style={{
+                            padding: "14px 8px", borderRadius: "2px", cursor: isOpen ? "pointer" : "not-allowed",
+                            border: orderDay === day.id ? `1px solid ${gold}` : isRecommended ? `1px solid ${gold}` : `1px solid ${border}`,
+                            backgroundColor: !isOpen ? "rgba(0,0,0,0.04)" : orderDay === day.id ? goldDim : isRecommended ? "rgba(196,149,42,0.05)" : "transparent",
+                            fontFamily: "'Inter', sans-serif", fontSize: "13px",
+                            fontWeight: orderDay === day.id ? "700" : "400",
+                            color: !isOpen ? muted : orderDay === day.id ? gold : isRecommended ? gold : muted,
+                            opacity: isOpen ? 1 : 0.5, transition: "all 0.2s",
+                          }}
+                        >
+                          {day.label}
+                          {isRecommended && isOpen && !orderDay && <span style={{ display: "block", fontSize: "9px", marginTop: "2px", color: gold, fontWeight: "700", letterSpacing: "0.08em" }}>NEXT OPEN</span>}
+                          {!isOpen && <span style={{ display: "block", fontSize: "10px", marginTop: "2px" }}>Closed</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
               {/* Payment Method */}
@@ -1399,12 +1290,7 @@ export default function Home() {
                   <div style={{ backgroundColor: "#FFFBE6", border: "1px solid #FFD700", borderRadius: "4px", padding: "20px 24px" }}>
                     <p style={{ fontFamily: "'Inter', sans-serif", fontSize: "10px", fontWeight: "700", letterSpacing: "0.14em", textTransform: "uppercase" as const, color: gold, marginBottom: "14px" }}>Bank Transfer Details</p>
                     <div style={{ display: "grid", gap: "0" }}>
-                      {[
-                        { label: "Bank",           value: "First Citizens Bank"    },
-                        { label: "Account Name",   value: "Aden Anderson Flanders" },
-                        { label: "Account Number", value: "3058440"                },
-                        { label: "Account Type",   value: "Savings"                },
-                      ].map(row => (
+                      {BANK_DETAILS.map(row => (
                         <div key={row.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "1px solid rgba(0,0,0,0.06)", fontSize: "13px" }}>
                           <span style={{ color: muted }}>{row.label}</span>
                           <span style={{ fontWeight: "700", color: charcoal }}>{row.value}</span>
@@ -1423,6 +1309,13 @@ export default function Home() {
                   </div>
                 )}
 
+                {fulfillment === "delivery" && (
+                  <label style={{ display: "flex", alignItems: "flex-start", gap: "10px", padding: "14px 16px", backgroundColor: "#EBF3FF", border: "1px solid #B8D4F5", borderRadius: "4px", cursor: "pointer", marginBottom: "12px" }}>
+                    <input type="checkbox" checked={deliveryAcknowledged} onChange={e => setDeliveryAcknowledged(e.target.checked)} style={{ marginTop: "3px", accentColor: "#1A56A4", flexShrink: 0, width: "15px", height: "15px" }} />
+                    <span style={{ fontSize: "12px", color: "#1A56A4", lineHeight: 1.6 }}>I understand that delivery may arrive at any time between <strong>11:30 AM and 6:00 PM</strong> and is not guaranteed for lunchtime.</span>
+                  </label>
+                )}
+
                 {submitError && <div style={{ backgroundColor: "#FFECEC", border: "1px solid #F5C6C6", borderRadius: "2px", padding: "14px", fontSize: "12px", color: "#A03030" }}>⚠️ {submitError}</div>}
                 <button onClick={handleSubmit} disabled={submitting} style={{ ...goldBtn, width: "100%", padding: "18px", fontSize: "13px", opacity: submitting ? 0.7 : 1 }} className="gold-btn">
                   {submitting ? "Placing Order..." : `Confirm Order — TT$${totalPrice}`}
@@ -1438,6 +1331,7 @@ export default function Home() {
             <p style={{ fontSize: "48px", marginBottom: "16px" }}>🎉</p>
             <h2 style={{ fontFamily: "'Cinzel', serif", fontSize: "32px", fontWeight: "600", color: black, marginBottom: "16px" }}>Order Received</h2>
             <p style={{ color: muted, fontSize: "14px", marginBottom: "8px" }}>Thank you, <strong style={{ color: black }}>{name}</strong>. Your order has been placed successfully.</p>
+            {orderNumber && <p style={{ color: black, fontSize: "15px", marginBottom: "8px" }}>Order number: <strong style={{ color: gold, letterSpacing: "0.04em" }}>{orderNumber}</strong></p>}
             {paymentMethod === "bank" && (
               <div style={{ backgroundColor: "#FFFBE6", border: "1px solid #FFD700", borderRadius: "4px", padding: "16px 20px", margin: "16px auto", maxWidth: "440px", fontSize: "13px", color: "#7a5c00", lineHeight: 1.8 }}>
                 <strong>Proof of payment will be requested upon order confirmation.</strong> Please send your bank transfer receipt to @theclub.boils on Instagram or WhatsApp 868-293-0570 to confirm your order.
@@ -1447,7 +1341,12 @@ export default function Home() {
               {cart.map((item, idx) => <p key={idx} style={{ fontSize: "13px", color: muted, marginBottom: "6px", padding: "8px 0", borderBottom: `1px solid ${border}` }}>· {item.quantity}x {item.name} — {item.description}</p>)}
             </div>
             <p style={{ color: muted, fontSize: "13px", marginTop: "16px" }}>{fulfillment === "delivery" ? `🚗 Delivering to: ${address}` : "🏠 Pickup — Arima (Thu, Fri & Sat)"}</p>
-            {orderDay && selectedFulfilmentDate && <p style={{ color: gold, fontSize: "15px", fontWeight: "700", marginTop: "8px" }}>📅 Your order is for {orderDay.charAt(0).toUpperCase() + orderDay.slice(1)}, {new Date(selectedFulfilmentDate + "T12:00:00-04:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}</p>}
+            {fulfillment === "delivery" && (
+              <div style={{ backgroundColor: "#EBF3FF", border: "1px solid #B8D4F5", borderRadius: "4px", padding: "12px 16px", margin: "10px auto", maxWidth: "440px", fontSize: "12px", color: "#1A56A4", lineHeight: 1.6, textAlign: "left" as const }}>
+                🕐 <strong>Delivery window: 11:30 AM – 6:00 PM.</strong> Please ensure you are available to receive your order. A lunchtime delivery is not guaranteed.
+              </div>
+            )}
+            {orderDay && <p style={{ color: gold, fontSize: "15px", fontWeight: "700", marginTop: "8px" }}>📅 Your order is for {orderDay.charAt(0).toUpperCase() + orderDay.slice(1)}</p>}
             <p style={{ fontFamily: "'Cinzel', serif", fontSize: "28px", color: gold, margin: "20px 0 8px" }}>TT${totalPrice}</p>
             <p style={{ color: muted, fontSize: "12px", letterSpacing: "0.04em" }}>We will confirm via text to <strong>{phone}</strong> before Friday 8PM.</p>
           </section>
@@ -1536,7 +1435,7 @@ export default function Home() {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "1px", backgroundColor: border }}>
               {[
                 { icon: "📍", label: "Location", value: "Arima, Trinidad", sub: "Exact address shared upon confirmation" },
-                { icon: "🕛", label: "Hours",    value: "Thu, Fri &amp; Sat", sub: "12:00 PM – 6:00 PM" },
+                { icon: "🕛", label: "Hours",    value: "Thu, Fri & Sat", sub: "12:00 PM – 6:00 PM" },
                 { icon: "📞", label: "Phone",    value: "868-293-0570", sub: "Call or WhatsApp", href: "tel:8682930570" },
                 { icon: "📸", label: "Instagram", value: "@theclub.boils", sub: "Follow for updates", href: "https://instagram.com/theclub.boils" },
               ].map(item => (
