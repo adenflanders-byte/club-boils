@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import {
   SEAFOOD, DUO_SEAFOOD, EXTRAS, DUO_EXTRAS, ADDON_EXTRAS, HEATS, SOLO_OPTIONS, DUO_OPTIONS, SIMPLE_ITEMS,
-  LOBSTER_PRODUCTS, BUILD_BASE, DELIVERY_FEE, type LineInput,
+  LOBSTER_PRODUCTS, BUILD_BASE, DELIVERY_FEE, ALLERGY_WARNING, type LineInput,
 } from "@/lib/menu";
 import { BANK_DETAILS } from "@/lib/payments";
 import { EAST_AREAS, REVIEW_AREAS } from "@/lib/areas";
@@ -1223,6 +1223,7 @@ export default function Home() {
                 <div>
                   <label style={labelStyle}>Special Notes / Allergies</label>
                   <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Any requests or allergies we should know about..." rows={3} style={{ ...inputStyle, resize: "vertical" }} />
+                  <p style={{ fontSize: "11px", color: "#7a5c00", lineHeight: 1.6, marginTop: "6px" }}>⚠️ {ALLERGY_WARNING}</p>
                 </div>
                 <div style={{ backgroundColor: cream, borderRadius: "2px", border: `1px solid ${border}`, padding: "20px" }}>
                   <p style={{ ...labelStyle, marginBottom: "16px" }}>Order Summary</p>

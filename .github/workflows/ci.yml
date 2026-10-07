@@ -86,14 +86,16 @@ jobs:
         run: |
           npx eslint lib components proxy.ts app/api app/admin/events app/admin/login app/school-orders 2>&1 | tee lint.log
           test ${PIPESTATUS[0]} -eq 0
-      - name: Lint (whole project, for information)
+      - name: Lint (whole project, compared with main — for information)
         if: always()
+        continue-on-error: true
         run: |
           npx eslint . > lint-all.log 2>&1 || true
-          git fetch -q --depth 1 origin main && git worktree add -q /tmp/main origin/main && \
-            (cd /tmp/main && npm ci --silent >/dev/null 2>&1 && npx eslint . > /tmp/lint-main.log 2>&1; true)
-          echo "main: $(tail -n 3 /tmp/lint-main.log | grep problems) | this branch: $(grep problems lint-all.log)" | tee lint-compare.log
-          cp /tmp/lint-main.log lint-main.log || true
+          git fetch -q --depth 1 origin main:refs/remotes/origin/main || true
+          git worktree add -q /tmp/main origin/main || true
+          (cd /tmp/main && npm ci --silent >/dev/null 2>&1 && npx eslint . > /tmp/lint-main.log 2>&1) || true
+          cp /tmp/lint-main.log lint-main.log 2>/dev/null || true
+          echo "main: $(grep problems lint-main.log 2>/dev/null) | this branch: $(grep problems lint-all.log)" | tee lint-compare.log
 
       - name: Start the site
         env:
@@ -127,6 +129,7 @@ jobs:
           .github/scripts/annotate.sh "Build" build.log
           .github/scripts/annotate.sh "Type-check" tsc.log
           .github/scripts/annotate.sh "Lint" lint.log
+          .github/scripts/annotate.sh "Lint vs main" lint-compare.log
           .github/scripts/annotate.sh "E2E" e2e.log
 
       - name: Publish screenshots and logs to refs/ci/artifacts
