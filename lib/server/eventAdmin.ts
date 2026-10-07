@@ -12,7 +12,8 @@ const PAYMENT_METHODS = ["cash_on_collection", "bank_transfer"];
 /** Strip secrets before sending an event to the browser. */
 export function adminEventView(ev: SchoolEventRow) {
   const { access_code_hash, ...rest } = ev;
-  return { ...rest, has_access_code: access_code_hash !== null };
+  const orderingOpen = ev.status === "open" && Date.now() < new Date(ev.order_cutoff_at).getTime();
+  return { ...rest, has_access_code: access_code_hash !== null, ordering_open: orderingOpen };
 }
 
 export function defaultPolicyText(schoolName: string, eventDate: string, start: Date, end: Date, cutoff: Date) {

@@ -88,7 +88,12 @@ jobs:
           test ${PIPESTATUS[0]} -eq 0
       - name: Lint (whole project, for information)
         if: always()
-        run: npx eslint . 2>&1 | tail -n 40 | tee lint-all.log || true
+        run: |
+          npx eslint . > lint-all.log 2>&1 || true
+          git fetch -q --depth 1 origin main && git worktree add -q /tmp/main origin/main && \
+            (cd /tmp/main && npm ci --silent >/dev/null 2>&1 && npx eslint . > /tmp/lint-main.log 2>&1; true)
+          echo "main: $(tail -n 3 /tmp/lint-main.log | grep problems) | this branch: $(grep problems lint-all.log)" | tee lint-compare.log
+          cp /tmp/lint-main.log lint-main.log || true
 
       - name: Start the site
         env:

@@ -13,7 +13,7 @@ interface AdminEvent {
   order_cutoff_at: string; collection_start_at: string; collection_end_at: string;
   collection_location: string; collection_instructions: string; status: "draft" | "open" | "closed" | "archived";
   event_fee: number; allowed_payment_methods: string[]; hidden_item_ids: string[]; student_id_required: boolean;
-  session_ttl_minutes: number; policy_text: string; policy_version: string; has_access_code: boolean; updated_at: string;
+  session_ttl_minutes: number; policy_text: string; policy_version: string; has_access_code: boolean; ordering_open: boolean; updated_at: string;
 }
 interface EventOrder {
   id: string; created_at: string; order_number: string | null; name: string; phone: string; email: string | null;
@@ -55,11 +55,14 @@ export default function SchoolEventsAdmin() {
   const [selected, setSelected] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
 
-  const loadEvents = useCallback(async () => {
-    const res = await adminFetch<{ data: AdminEvent[] }>("/api/admin/events");
+  const loadEvents = useCallback(() => adminFetch<{ data: AdminEvent[] }>("/api/admin/events").then(res => {
     if (res.ok) setEvents(res.data.data);
+  }), []);
+  useEffect(() => {
+    let cancelled = false;
+    adminFetch<{ data: AdminEvent[] }>("/api/admin/events").then(res => { if (!cancelled && res.ok) setEvents(res.data.data); });
+    return () => { cancelled = true; };
   }, []);
-  useEffect(() => { loadEvents(); }, [loadEvents]);
 
   return (
     <>
@@ -137,18 +140,23 @@ function EventDetail({ id, onBack, onOpen }: { id: string; onBack: () => void; o
   const [tab, setTab] = useState<"dashboard" | "orders" | "prep" | "collection" | "settings">("dashboard");
   const [error, setError] = useState("");
 
-  const load = useCallback(async () => {
-    const res = await adminFetch<{ event: AdminEvent; orders: EventOrder[]; totals: Totals }>(`/api/admin/events/${id}`);
+  type Detail = { event: AdminEvent; orders: EventOrder[]; totals: Totals };
+  const apply = useCallback((res: { ok: boolean; data: Detail & { error?: string } }) => {
     if (res.ok) setData(res.data); else setError(res.data.error || "Could not load the event.");
-  }, [id]);
-  useEffect(() => { load(); }, [load]);
+  }, []);
+  const load = useCallback(() => adminFetch<Detail>(`/api/admin/events/${id}`).then(apply), [id, apply]);
+  useEffect(() => {
+    let cancelled = false;
+    adminFetch<Detail>(`/api/admin/events/${id}`).then(res => { if (!cancelled) apply(res); });
+    return () => { cancelled = true; };
+  }, [id, apply]);
 
   if (error) return <p style={{ color: C.red }}>{error}</p>;
   if (!data) return <p style={{ color: C.muted }}>Loading…</p>;
   const ev = data.event;
   const st = EVENT_STATE_STYLE[ev.status];
   const link = typeof window !== "undefined" ? `${window.location.origin}/school-orders/${ev.slug}` : `/school-orders/${ev.slug}`;
-  const cutoffPassed = Date.now() >= new Date(ev.order_cutoff_at).getTime();
+  const cutoffPassed = !ev.ordering_open && ev.status === "open";
 
   async function setStatus(status: string) {
     const msg: Record<string, string> = {
@@ -278,7 +286,7 @@ function useOrderFilters(orders: EventOrder[]) {
 
 async function changeStatus(order: EventOrder, status: string, reload: () => void) {
   const forward = ["new", "confirmed", "preparing", "ready", "completed"];
-  const isCorrection = status !== "cancelled" && forward.indexOf(status) < forward.indexOf(order.status) || order.status === "cancelled";
+  const isCorrection = (status !== "cancelled" && forward.indexOf(status) < forward.indexOf(order.status)) || order.status === "cancelled";
   let reason: string | null = null;
   if (status === "completed" && !window.confirm(`Confirm ${order.name} (${order.order_number}) has collected their order?\n\nThis does not mark it paid.`)) return;
   if (status === "cancelled" && !window.confirm(`Cancel order ${order.order_number} for ${order.name}? It will be excluded from expected revenue.`)) return;

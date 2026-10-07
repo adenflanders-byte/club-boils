@@ -64,23 +64,31 @@ export default function EventOrdering({ slug }: { slug: string }) {
   const [idemKey, setIdemKey] = useState("");
   const [receipt, setReceipt] = useState<Receipt | null>(null);
 
-  const load = useCallback(async () => {
+  // Fetch, then apply in a callback (keeps React's effect rules happy).
+  const fetchEvent = useCallback(async () => {
     try {
       const res = await fetch(`/api/events/${slug}`, { cache: "no-store", credentials: "same-origin" });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) { setLoadError(data.error || "This ordering page is not available."); return; }
-      setInfo(data.event);
-      setAccess(Boolean(data.access));
-      if (data.access) {
-        setMenu(data.menu ?? []);
-        if (data.serverTime) setClockSkew(new Date(data.serverTime).getTime() - Date.now());
-      }
+      return { ok: res.ok, data: await res.json().catch(() => ({})) };
     } catch {
-      setLoadError("Could not load the ordering page. Check your connection and refresh.");
+      return { ok: false, data: { error: "Could not load the ordering page. Check your connection and refresh." } };
     }
   }, [slug]);
+  const apply = useCallback(({ ok, data }: { ok: boolean; data: Record<string, unknown> & { error?: string } }) => {
+    if (!ok) { setLoadError(data.error || "This ordering page is not available."); return; }
+    setInfo(data.event as EventInfo);
+    setAccess(Boolean(data.access));
+    if (data.access) {
+      setMenu((data.menu as PublicMenuItem[]) ?? []);
+      if (data.serverTime) setClockSkew(new Date(String(data.serverTime)).getTime() - Date.now());
+    }
+  }, []);
+  const load = useCallback(() => fetchEvent().then(apply), [fetchEvent, apply]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    let cancelled = false;
+    fetchEvent().then(r => { if (!cancelled) apply(r); });
+    return () => { cancelled = true; };
+  }, [fetchEvent, apply]);
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
 
   // Keep the cart if the page is refreshed (this device only).
