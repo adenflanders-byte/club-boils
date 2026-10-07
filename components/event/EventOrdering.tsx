@@ -34,7 +34,11 @@ const gold = "#C4952A", cream = "#FAF8F3", black = "#0A0A0A", charcoal = "#1C1C1
 
 const lineKey = (l: Omit<LineInput, "quantity">) => JSON.stringify([l.itemId, l.addons ?? {}, l.seafood ?? [], l.extras ?? [], l.heat ?? ""]);
 const newKey = () => { const b = new Uint8Array(18); crypto.getRandomValues(b); return Array.from(b, x => x.toString(16).padStart(2, "0")).join(""); };
-const shortDate = (d: string) => formatDateOnly(d, { day: "numeric", month: "short", year: "numeric" });
+/** "15 Oct 2026" */
+const shortDate = (d: string) => {
+  const [y, m, day] = d.split("-").map(Number);
+  return `${day} ${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][m - 1]} ${y}`;
+};
 
 export default function EventOrdering({ slug }: { slug: string }) {
   const [info, setInfo] = useState<EventInfo | null>(null);
@@ -264,7 +268,7 @@ export default function EventOrdering({ slug }: { slug: string }) {
   const eventTag = (
     <div className="ev-tags">
       <div><span>Event</span><strong>{info.shortName || info.schoolName} - {shortDate(info.eventDate)}</strong></div>
-      <div><span>School Collection</span><strong>{window_}</strong></div>
+      <div><span>School Collection</span><strong>{formatTTTime(info.collectionStartAt)}-{formatTTTime(info.collectionEndAt)}</strong></div>
     </div>
   );
 

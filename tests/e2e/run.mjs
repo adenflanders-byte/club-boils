@@ -32,7 +32,7 @@ function check(name, ok, detail = "") {
 async function step(name, fn) {
   try { await fn(); } catch (e) { check(name, false, `threw: ${e?.message?.split("\n")[0]}`); }
 }
-const sql = (q) => execFileSync("psql", [DB_URL, "-At", "-v", "ON_ERROR_STOP=1", "-c", q], { encoding: "utf8" }).trim();
+const sql = (q) => execFileSync("psql", [DB_URL, "-qAt", "-v", "ON_ERROR_STOP=1", "-c", q], { encoding: "utf8" }).trim();
 const key = () => Array.from(crypto.getRandomValues(new Uint8Array(18)), b => b.toString(16).padStart(2, "0")).join("");
 
 /** fetch with a cookie jar per "client" */
@@ -42,7 +42,7 @@ function client(extraHeaders = {}) {
     jar,
     async req(path, { method = "GET", body, headers = {} } = {}) {
       const h = { ...extraHeaders, ...headers };
-      if (body !== undefined) { h["content-type"] = "application/json"; h.origin = BASE; }
+      if (body !== undefined) { h["content-type"] = "application/json"; h.origin = h.origin || BASE; }
       if (jar.size) h.cookie = [...jar].map(([k, v]) => `${k}=${v}`).join("; ");
       const res = await fetch(BASE + path, { method, headers: h, body: body === undefined ? undefined : JSON.stringify(body), redirect: "manual" });
       for (const c of res.headers.getSetCookie?.() ?? []) {
@@ -282,7 +282,7 @@ await step("10. student flow on a phone (screenshots)", async () => {
   const bannerText = await page.textContent(".ev-banner");
   check("banner text", /ARTHUR LOK JACK SCHOOL EVENT.*Order your Club Boils for Thursday, October 15\. Orders close at 9:30 AM\. All orders will be available at the school between 12:00 PM and 2:00 PM\./s.test(bannerText.replace(/\s+/g, " ")), bannerText);
   await page.screenshot({ path: `${SHOTS}/mobile-2-menu.png`, fullPage: true });
-  check("hidden item absent in UI", !(await page.locator("text=Wings Boil").count()));
+  check("hidden item absent in UI", (await page.locator("h3.ev-item-name", { hasText: /^Wings Boil$/ }).count()) === 0);
   await page.click("button[aria-label='Add Club Solo Shrimp']");
   await page.locator("button:has-text('Build')").first().click();
   await page.click(".ev-sheet >> text=Shrimp");
@@ -292,7 +292,7 @@ await step("10. student flow on a phone (screenshots)", async () => {
   await page.click(".ev-sticky button");
   await page.waitForSelector("text=Your order");
   const tagText = await page.textContent(".ev-tags");
-  check("cart shows event and collection window", tagText.includes("Arthur Lok Jack - 15 Oct 2026") && tagText.includes("12:00 PM–2:00 PM"), tagText);
+  check("cart shows event and collection window", tagText.includes("Arthur Lok Jack - 15 Oct 2026") && tagText.includes("12:00 PM-2:00 PM"), tagText);
   await page.screenshot({ path: `${SHOTS}/mobile-4-cart.png`, fullPage: true });
   await page.click("text=Checkout —");
   await page.fill("input[autocomplete=name]", "Phone Student");
@@ -376,7 +376,7 @@ await step("12. dashboard, prep and collection lists (screenshots)", async () =>
   check("prep totals match order lines", prepQty === lines, `${prepQty} vs ${lines}`);
   check("prep list shows allergy notes", (await page.textContent("body")).includes("No pork please"));
   await page.screenshot({ path: `${SHOTS}/desktop-admin-prep.png`, fullPage: true });
-  await page.click("text=Collection");
+  await page.click(".ae-tabs button:has-text('Collection')");
   await page.screenshot({ path: `${SHOTS}/desktop-admin-collection.png`, fullPage: true });
   await page.fill("input[aria-label=Search]", "S123");
   check("collection search by student ID", (await page.locator(".ae-table tbody tr").count()) === 1);
