@@ -22,9 +22,9 @@ interface Receipt {
 type CartEntry = { key: string; line: LineInput };
 
 const GROUPS: { id: CatalogGroup; title: string; blurb: string }[] = [
-  { id: "solo",    title: "Club Solo",          blurb: "One person · corn, potatoes, egg & sausage included" },
+  { id: "solo",    title: "Club Solo",          blurb: "For one" },
   { id: "duo",     title: "Club Duo",           blurb: "Made to share" },
-  { id: "lobster", title: "Lobster Boils",      blurb: "The full Club experience" },
+  { id: "lobster", title: "Lobster Boils",      blurb: "Solo or Duo" },
   { id: "build",   title: "Build Your Own Boil", blurb: "Pick your seafood, extras and heat" },
   { id: "more",    title: "More from the Menu", blurb: "" },
 ];
