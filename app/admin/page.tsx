@@ -115,6 +115,14 @@ export default function AdminPage() {
     if (authed) { fetchOrders(); fetchSettings(); fetchReviews(); }
   }, [authed]);
 
+  // New orders appear without a manual refresh.
+  useEffect(() => {
+    if (!authed) return;
+    const t = setInterval(() => { supabase.from("orders").select("*").order("created_at", { ascending: false })
+      .then(({ data }) => { if (data) setOrders(data as Order[]); }); }, 60_000);
+    return () => clearInterval(t);
+  }, [authed]);
+
   // ── Business week helper ──────────────────────────────────────
   function getBusinessWeek(dateISO: string): { key: string; label: string; startDate: Date; endDate: Date } {
     // Parse the date at noon TT time to avoid any day-boundary issues
@@ -723,7 +731,7 @@ export default function AdminPage() {
           </div>
 
           {/* Weekly Order Archive */}
-          {completedOrders.length > 0 && (() => {
+          {orders.length > 0 && (() => {
             const curKey  = getCurrentWeekKey();
             const lastKey = getLastWeekKey();
 
@@ -753,6 +761,15 @@ export default function AdminPage() {
               const fd = getFulfilmentDate(o); if (!fd) return false;
               return getBusinessWeek(fd).key === curKey;
             });
+
+            // Active orders for future weeks (e.g. placed Friday for next Thursday)
+            const upcomingActive = orders
+              .filter(o => {
+                if (o.status === "completed" || o.status === "cancelled") return false;
+                const fd = getFulfilmentDate(o); if (!fd) return false;
+                return getBusinessWeek(fd).key > curKey;
+              })
+              .sort((a, b) => (getFulfilmentDate(a) || "").localeCompare(getFulfilmentDate(b) || ""));
 
             function renderOrderCard(order: Order) {
               const cfg2 = STATUS_CONFIG[order.status];
@@ -907,6 +924,19 @@ export default function AdminPage() {
                 <p style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "0.1em", textTransform: "uppercase" as const, color: C.gold, marginBottom: "6px" }}>Order Archive</p>
                 <h3 style={{ fontFamily: FONT_DISPLAY, fontSize: "20px", fontWeight: "400", color: C.black, marginBottom: "24px" }}>Weekly History</h3>
 
+                {/* Upcoming weeks */}
+                {upcomingActive.length > 0 && (
+                  <div style={{ marginBottom: "32px" }}>
+                    <div style={{ display: "flex", alignItems: "baseline", gap: "12px", marginBottom: "12px", paddingBottom: "10px", borderBottom: `2px solid ${C.gold}` }}>
+                      <span style={{ fontFamily: FONT_DISPLAY, fontSize: "17px", color: C.black }}>📅 Upcoming</span>
+                      <span style={{ fontSize: "12px", color: C.muted }}>{upcomingActive.length} order{upcomingActive.length !== 1 ? "s" : ""} for future weeks · TT${upcomingActive.reduce((s, o) => s + o.total, 0)}</span>
+                    </div>
+                    <div style={{ display: "grid", gap: "8px" }}>
+                      {upcomingActive.map(o => renderOrderCard(o))}
+                    </div>
+                  </div>
+                )}
+
                 {/* This Week */}
                 <div style={{ marginBottom: "32px" }}>
                   {renderWeekHeader(weekGroups[curKey]?.label || getBusinessWeek(getNowTT().toISOString().split("T")[0]).label, [...thisWeekActive, ...thisWeekCompleted], true)}
@@ -986,7 +1016,7 @@ export default function AdminPage() {
 
           {/* Filter tabs */}
           <div style={{ display: "flex", gap: "8px", marginBottom: "16px", flexWrap: "wrap" as const }}>
-            {(["all","new","confirmed","ready","completed","cancelled"] as const).map(tab => (
+            {(["all","new","confirmed","preparing","ready","completed","cancelled"] as const).map(tab => (
               <button key={tab} onClick={() => setFilter(tab)} style={{
                 padding: "8px 18px", borderRadius: "20px",
                 border: filter === tab ? "none" : `1px solid ${C.border}`,
@@ -1018,7 +1048,7 @@ export default function AdminPage() {
             </div>
           ) : (
             <div style={{ display: "grid", gap: "32px" }}>
-              {(["new","confirmed","ready","completed","cancelled"] as const).map(status => {
+              {(["new","confirmed","preparing","ready","completed","cancelled"] as const).map(status => {
                 const statusOrders = filtered.filter(o => o.status === status);
                 if (statusOrders.length === 0) return null;
                 const cfg = STATUS_CONFIG[status];
