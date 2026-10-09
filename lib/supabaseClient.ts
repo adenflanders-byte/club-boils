@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./supabaseConfig";
 
-export const supabase = createClient(
-  "https://sbgwgwelhphnwjsuemqf.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNiZ3dnd2VsaHBobndqc3VlbXFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3MTQ0OTAsImV4cCI6MjA5NzI5MDQ5MH0.h7CNx0-ncHwvRMrb4h9gVtO-Q0twzxbpMeoiIcYRky4"
-);
+// Browser client with the public key. After the RLS lockdown it can only
+// read settings and approved reviews, and submit unapproved reviews.
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);

@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabaseClient";
+import { adminDb as supabase, adminFetch, adminSignOut } from "@/lib/adminApi";
+import { orderPaymentMethod } from "@/lib/payments";
 
 // ── Types ──────────────────────────────────────────────────────────────
 type TxType = "income" | "expense" | "equity";
@@ -49,7 +50,6 @@ interface Order {
 const INCOME_CATS  = ["Order Sales", "Delivery Income", "Catering", "Other Income"];
 const EXPENSE_CATS = ["Ingredients", "Packaging", "Delivery/Driver Fees", "Gas & Transport", "Equipment", "Marketing", "Utilities", "Labour/Wages", "Rent", "Repairs & Maintenance", "Bank/Processing Fees", "Refunds", "Taxes", "Other"];
 const EQUITY_CATS  = ["Owner Contribution", "Owner Draw"];
-const PASSWORD     = "anderson56$";
 
 // Trinidad timezone helper
 function toTT(d: Date): Date {
@@ -77,6 +77,7 @@ function getWeekKey(dateStr: string): string {
 function getMonthKey(dateStr: string): string { return dateStr.slice(0, 7); }
 function getYearKey(dateStr: string):  string { return dateStr.slice(0, 4); }
 function getFulfilmentDate(order: Order): string | null {
+  if (order.scheduled_fulfilment_date) return order.scheduled_fulfilment_date;
   if (!order.notes) return null;
   const m = order.notes.match(/Day:\s*(Thursday|Friday|Saturday)/i);
   if (!m) return null;
@@ -129,8 +130,6 @@ function Tip({ text }: { text: string }) {
 
 export default function AccountsPage() {
   const [authed,       setAuthed]       = useState(false);
-  const [pwInput,      setPwInput]      = useState("");
-  const [pwError,      setPwError]      = useState(false);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [orders,       setOrders]       = useState<Order[]>([]);
   const [loading,      setLoading]      = useState(false);
@@ -185,6 +184,11 @@ export default function AccountsPage() {
     if (authed) { fetchTransactions(); fetchOrders(); }
   }, [authed]);
 
+  // Access is enforced on the server (proxy + API); this just confirms the session.
+  useEffect(() => {
+    adminFetch("/api/admin/session").then(res => { if (res.ok) setAuthed(true); });
+  }, []);
+
   async function fetchTransactions() {
     setLoading(true);
     const { data } = await supabase.from("accounts").select("*").order("date", { ascending: false });
@@ -196,17 +200,14 @@ export default function AccountsPage() {
     if (data) setOrders(data as Order[]);
   }
 
-  function handleLogin() {
-    if (pwInput === PASSWORD) { setAuthed(true); setPwError(false); }
-    else setPwError(true);
-  }
+
 
   async function addTransaction() {
     if (!newCat || !newAmount || isNaN(Number(newAmount))) { alert("Please fill in category and amount."); return; }
     setSaving(true);
     await supabase.from("accounts").insert({
       type: newType, category: newCat, description: newDesc.trim() || null,
-      amount: Math.round(Number(newAmount)), date: newDate,
+      amount: Math.round(Number(newAmount) * 100) / 100, date: newDate,
       payment_method: newPMethod || null, supplier: newSupplier.trim() || null,
       notes: newNotes.trim() || null,
     });
@@ -230,11 +231,11 @@ export default function AccountsPage() {
     if (!editId) return;
     await supabase.from("accounts").update({
       type: editType, category: editCat, description: editDesc.trim() || null,
-      amount: Math.round(Number(editAmount)), date: editDate,
+      amount: Math.round(Number(editAmount) * 100) / 100, date: editDate,
     }).eq("id", editId);
     setTransactions(prev => prev.map(t => t.id === editId ? {
       ...t, type: editType, category: editCat, description: editDesc,
-      amount: Math.round(Number(editAmount)), date: editDate,
+      amount: Math.round(Number(editAmount) * 100) / 100, date: editDate,
     } : t));
     setEditId(null);
   }
@@ -248,21 +249,11 @@ export default function AccountsPage() {
         r.onerror = () => rej(new Error("Read failed"));
         r.readAsDataURL(file);
       });
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-6", max_tokens: 1000,
-          messages: [{ role: "user", content: [
-            { type: "image", source: { type: "base64", media_type: file.type as any, data: base64 } },
-            { type: "text", text: `You are analyzing a receipt for The Club Boils, a seafood business in Trinidad. Extract all line items. For each item pick the best category from: ${EXPENSE_CATS.join(", ")}. Return ONLY JSON: {"items":[{"description":"string","amount":number,"category":"string"}],"total":number,"date":"YYYY-MM-DD or empty","supplier":"store name or empty"}` }
-          ]}]
-        })
+      const res = await adminFetch<{ result: typeof scanResult }>("/api/admin/scan-receipt", {
+        body: { image: base64, mediaType: file.type, categories: EXPENSE_CATS },
       });
-      const data = await response.json();
-      const text = data.content?.[0]?.text || "";
-      const clean = text.replace(/```json|```/g, "").trim();
-      setScanResult(JSON.parse(clean));
+      if (!res.ok) throw new Error(res.data.error || "scan failed");
+      setScanResult(res.data.result);
     } catch { setScanError("Could not read receipt. Try a clearer photo or enter manually."); }
     setScanning(false);
   }
@@ -273,7 +264,7 @@ export default function AccountsPage() {
     for (const item of scanResult.items) {
       await supabase.from("accounts").insert({
         type: "expense", category: item.category, description: item.description,
-        amount: Math.round(item.amount), date: scanResult.date || newDate,
+        amount: Math.round(Number(item.amount) * 100) / 100, date: scanResult.date || newDate,
         supplier: scanResult.supplier || null,
       });
     }
@@ -352,16 +343,20 @@ export default function AccountsPage() {
 
   // Payment breakdown — uses period-filtered completed orders (not all time)
   const paymentBase  = periodFilter === "all" ? completedOrders : periodCompletedOrders;
-  const bankOrders   = paymentBase.filter(o => o.notes && o.notes.includes("Bank Transfer"));
-  const cashOrders   = paymentBase.filter(o => o.notes && o.notes.includes("Cash on Delivery"));
-  const unclassified = paymentBase.filter(o => !o.notes?.includes("Bank Transfer") && !o.notes?.includes("Cash on Delivery"));
+  const payKind = (o: Order) => {
+    const m = orderPaymentMethod(o);
+    return m === "bank_transfer" || m === "online_provider" ? "bank" : m ? "cash" : "unclassified";
+  };
+  const bankOrders   = paymentBase.filter(o => payKind(o) === "bank");
+  const cashOrders   = paymentBase.filter(o => payKind(o) === "cash");
+  const unclassified = paymentBase.filter(o => payKind(o) === "unclassified");
 
   // Health checks
   const healthIssues: string[] = [];
   orders.filter(o => o.status !== "cancelled").forEach(o => {
     const fd = getFulfilmentDate(o);
     if (!fd) healthIssues.push(`⚠️ Order #${o.id.slice(0,8)} — ${o.name} (TT$${o.total}): missing fulfilment date — placed in Unassigned/Needs Review`);
-    if (o.status === "completed" && !o.notes?.includes("Bank Transfer") && !o.notes?.includes("Cash on Delivery"))
+    if (o.status === "completed" && payKind(o) === "unclassified")
       healthIssues.push(`⚠️ Order #${o.id.slice(0,8)} — ${o.name} (TT$${o.total}): completed but payment method unclassified`);
   });
   transactions.forEach(t => {
@@ -454,30 +449,12 @@ export default function AccountsPage() {
     textTransform: "uppercase" as const,
   };
 
-  // ── Login ──────────────────────────────────────────────────────────
+  // ── Session check (sign-in happens on /admin/login) ──────────────
   if (!authed) {
     return (
-      <>
-        <style>{`${FONTS} * { box-sizing: border-box; margin: 0; padding: 0; } @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }`}</style>
-        <main style={{ backgroundColor: C.black, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FB, padding: "24px", position: "relative" as const, overflow: "hidden" }}>
-          <div style={{ position: "absolute", top: "20%", left: "50%", transform: "translateX(-50%)", width: "600px", height: "400px", background: "radial-gradient(ellipse, rgba(196,149,42,0.08) 0%, transparent 70%)", pointerEvents: "none" }} />
-          <div style={{ backgroundColor: "rgba(255,255,255,0.03)", backdropFilter: "blur(20px)", borderRadius: "8px", border: `1px solid ${C.border}`, padding: "52px 44px", maxWidth: "420px", width: "100%", textAlign: "center" as const, animation: "fadeUp 0.6s ease both", boxShadow: "0 32px 64px rgba(0,0,0,0.4)" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "12px", marginBottom: "8px" }}>
-              <span style={{ color: C.gold, fontSize: "28px" }}>♣</span>
-              <h1 style={{ fontFamily: FD, fontSize: "22px", fontWeight: "600", color: C.white, letterSpacing: "0.06em" }}>THE CLUB BOILS</h1>
-            </div>
-            <p style={{ fontSize: "10px", fontWeight: "700", letterSpacing: "0.22em", textTransform: "uppercase" as const, color: C.gold, marginBottom: "40px" }}>Business Accounts</p>
-            <div style={{ textAlign: "left" as const, marginBottom: "16px" }}>
-              <label style={labelSt}>Password</label>
-              <input type="password" value={pwInput} onChange={e => { setPwInput(e.target.value); setPwError(false); }}
-                onKeyDown={e => e.key === "Enter" && handleLogin()} placeholder="Enter password"
-                style={{ ...inputStyle, backgroundColor: "rgba(255,255,255,0.05)", border: pwError ? "1px solid #C0392B" : `1px solid ${C.border}`, color: C.white }} />
-              {pwError && <p style={{ color: "#C0392B", fontSize: "12px", marginTop: "6px" }}>Incorrect password.</p>}
-            </div>
-            <button onClick={handleLogin} style={{ ...goldBtn, width: "100%", padding: "14px" }}>Sign In</button>
-          </div>
-        </main>
-      </>
+      <main style={{ backgroundColor: C.black, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FB, color: C.gold, fontSize: "12px", letterSpacing: "0.2em" }}>
+        LOADING…
+      </main>
     );
   }
 
@@ -504,7 +481,7 @@ export default function AccountsPage() {
           </div>
           <div style={{ display: "flex", gap: "8px" }}>
             <a href="/admin" style={{ border: `1px solid ${C.border}`, color: C.gold, padding: "7px 16px", borderRadius: "4px", fontSize: "11px", fontFamily: FB, textDecoration: "none", letterSpacing: "0.06em", fontWeight: "600" }}>← Orders</a>
-            <button onClick={() => setAuthed(false)} style={{ backgroundColor: "transparent", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.3)", padding: "7px 16px", borderRadius: "4px", cursor: "pointer", fontSize: "11px", fontFamily: FB }}>Sign Out</button>
+            <button onClick={adminSignOut} style={{ backgroundColor: "transparent", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.3)", padding: "7px 16px", borderRadius: "4px", cursor: "pointer", fontSize: "11px", fontFamily: FB }}>Sign Out</button>
           </div>
         </header>
 

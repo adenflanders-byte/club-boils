@@ -1,0 +1,142 @@
+name: CI
+on:
+  push:
+    branches-ignore: [ci-artifacts]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  database:
+    name: Database migrations & rules
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v5
+      - name: Apply migrations twice and run database tests
+        env:
+          PGPASSWORD: postgres
+        run: |
+          db/test/run.sh "-h localhost -U postgres" | tee db-test.log
+          test "$(grep -c passed db-test.log)" -eq 6
+      - name: Report
+        if: always()
+        run: .github/scripts/annotate.sh "Database tests" db-test.log
+
+  app:
+    name: Build, lint, unit + end-to-end tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # to publish screenshots to refs/ci/artifacts
+    env:
+      ADMIN_EMAIL: admin@clubboils.test
+      ADMIN_PASSWORD: ci-only-Password-123!
+      SESSION_SECRET: ci-only-session-secret-0123456789abcdef
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Unit tests
+        run: npx -y tsx@4 --test tests/unit.test.ts 2>&1 | tee unit.log; test ${PIPESTATUS[0]} -eq 0
+
+      - name: Start local Supabase
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - run: |
+          mkdir -p /tmp/sb && cd /tmp/sb && supabase init --force >/dev/null
+          supabase start -x studio,imgproxy,mailpit,edge-runtime,logflare,vector,realtime,storage-api,postgres-meta,supavisor \
+            || supabase start
+          supabase status -o env | sed -e 's/^/SB_/' -e 's/"//g' >> "$GITHUB_ENV"
+
+      - name: Create the existing schema, apply migrations, create admin
+        run: |
+          P="psql $SB_DB_URL -v ON_ERROR_STOP=1 -q"
+          $P -f db/test/01_existing_schema.sql
+          $P -f db/migrations/001_secure_foundation_and_school_events.sql
+          $P -f db/migrations/002_lock_down_public_access.sql
+          $P -c "insert into settings(key,value) values ('menu_lobster_half','false'),('day_friday','true') on conflict (key) do update set value = excluded.value"
+          ID=$(curl -s -X POST "$SB_API_URL/auth/v1/admin/users" -H "apikey: $SB_SERVICE_ROLE_KEY" -H "Authorization: Bearer $SB_SERVICE_ROLE_KEY" \
+               -H "Content-Type: application/json" -d "{\"email\":\"$ADMIN_EMAIL\",\"password\":\"$ADMIN_PASSWORD\",\"email_confirm\":true}" | jq -r .id)
+          echo "admin user $ID"
+          $P -c "insert into admin_users(user_id, email) values ('$ID', '$ADMIN_EMAIL')"
+
+      - name: Build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ env.SB_API_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ env.SB_ANON_KEY }}
+        run: npm run build 2>&1 | tee build.log; test ${PIPESTATUS[0]} -eq 0
+
+      - name: Type-check
+        run: npx tsc --noEmit 2>&1 | tee tsc.log; test ${PIPESTATUS[0]} -eq 0
+
+      - name: Lint (new and changed server/security code must be clean)
+        run: |
+          npx eslint lib components proxy.ts app/api app/admin/events app/admin/login app/school-orders 2>&1 | tee lint.log
+          test ${PIPESTATUS[0]} -eq 0
+      - name: Lint (whole project, compared with main — for information)
+        if: always()
+        continue-on-error: true
+        run: |
+          npx eslint . > lint-all.log 2>&1 || true
+          git fetch -q --depth 1 origin main:refs/remotes/origin/main || true
+          git worktree add -q /tmp/main origin/main || true
+          (cd /tmp/main && npm ci --silent >/dev/null 2>&1 && npx eslint . > /tmp/lint-main.log 2>&1) || true
+          cp /tmp/lint-main.log lint-main.log 2>/dev/null || true
+          echo "main: $(grep problems lint-main.log 2>/dev/null) | this branch: $(grep problems lint-all.log)" | tee lint-compare.log
+
+      - name: Start the site
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ env.SB_API_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ env.SB_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ env.SB_SERVICE_ROLE_KEY }}
+        run: |
+          nohup npm start > server.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf http://localhost:3000 >/dev/null && break; sleep 1; done
+
+      - name: Install Playwright
+        run: |
+          npm i --no-save --prefix /tmp/pw playwright@1.56.1 >/dev/null
+          npx --prefix /tmp/pw playwright install --with-deps chromium >/dev/null
+
+      - name: End-to-end acceptance tests
+        env:
+          BASE_URL: http://localhost:3000
+          SUPABASE_URL: ${{ env.SB_API_URL }}
+          ANON_KEY: ${{ env.SB_ANON_KEY }}
+          SERVICE_KEY: ${{ env.SB_SERVICE_ROLE_KEY }}
+          DB_URL: ${{ env.SB_DB_URL }}
+          PW_DIR: /tmp/pw
+          SERVER_LOG: server.log
+        run: node tests/e2e/run.mjs 2>&1 | tee e2e.log; test ${PIPESTATUS[0]} -eq 0
+
+      - name: Report
+        if: always()
+        run: |
+          .github/scripts/annotate.sh "Unit tests" unit.log
+          .github/scripts/annotate.sh "Build" build.log
+          .github/scripts/annotate.sh "Type-check" tsc.log
+          .github/scripts/annotate.sh "Lint" lint.log
+          .github/scripts/annotate.sh "Lint vs main" lint-compare.log
+          .github/scripts/annotate.sh "E2E" e2e.log
+
+      - name: Publish screenshots and logs to refs/ci/artifacts
+        if: always()
+        run: |
+          mkdir -p /tmp/out && cp -r tests/e2e/screenshots /tmp/out/ 2>/dev/null || true
+          cp *.log /tmp/out/ 2>/dev/null || true
+          cd /tmp/out && git init -q && git add -A && \
+            git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -qm "CI artifacts for ${GITHUB_SHA}" && \
+            git push -qf "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" HEAD:refs/ci/artifacts
