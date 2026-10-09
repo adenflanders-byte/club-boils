@@ -1,0 +1,56 @@
+
+> club-boils@0.1.0 build
+> next build
+
+⚠ No build cache found. Please configure build caching for faster rebuilds. Read more: https://nextjs.org/docs/messages/no-cache
+Attention: Next.js now collects completely anonymous telemetry regarding usage.
+This information is used to shape Next.js' roadmap and prioritize features.
+You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+https://nextjs.org/telemetry
+
+▲ Next.js 16.2.9 (Turbopack)
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 3.5s
+  Running TypeScript ...
+  Finished TypeScript in 6.5s ...
+  Collecting page data using 3 workers ...
+  Generating static pages using 3 workers (0/14) ...
+  Generating static pages using 3 workers (3/14) 
+  Generating static pages using 3 workers (6/14) 
+  Generating static pages using 3 workers (10/14) 
+✓ Generating static pages using 3 workers (14/14) in 310ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ○ /accounts
+├ ○ /admin
+├ ○ /admin/events
+├ ○ /admin/login
+├ ƒ /api/admin/db
+├ ƒ /api/admin/events
+├ ƒ /api/admin/events/[id]
+├ ƒ /api/admin/events/[id]/access-code
+├ ƒ /api/admin/events/[id]/duplicate
+├ ƒ /api/admin/events/[id]/revoke-sessions
+├ ƒ /api/admin/login
+├ ƒ /api/admin/logout
+├ ƒ /api/admin/orders/[id]/payment-failed
+├ ƒ /api/admin/orders/[id]/payments
+├ ƒ /api/admin/orders/[id]/status
+├ ƒ /api/admin/scan-receipt
+├ ƒ /api/admin/session
+├ ƒ /api/events/[slug]
+├ ƒ /api/events/[slug]/access
+├ ƒ /api/events/[slug]/orders
+├ ƒ /api/orders
+└ ƒ /school-orders/[slug]
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+

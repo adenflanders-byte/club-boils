@@ -1,0 +1,116 @@
+PASS anon cannot read orders — HTTP 401
+PASS anon cannot read accounts — HTTP 401
+PASS anon cannot read payments — HTTP 401
+PASS anon cannot read school_events — HTTP 401
+PASS anon cannot read audit_log — HTTP 401
+PASS anon cannot read admin_users — HTTP 401
+PASS anon cannot read admin_sessions — HTTP 401
+PASS anon cannot read event_sessions — HTTP 401
+PASS anon cannot insert orders — HTTP 401
+PASS anon cannot update orders — HTTP 401
+PASS anon cannot call payment functions — HTTP 401
+PASS anon can still read menu settings
+PASS anon sees only approved reviews
+PASS /admin redirects to sign-in — HTTP 307
+PASS /accounts redirects to sign-in — HTTP 307
+PASS /admin/events redirects to sign-in — HTTP 307
+PASS GET /api/admin/events returns 401 — HTTP 401
+PASS POST /api/admin/db returns 401 — HTTP 401
+PASS GET /api/admin/orders/x/payments returns 401 — HTTP 401
+PASS forged admin cookie rejected — HTTP 401
+PASS wrong password rejected — 401,401,401,401,401,429
+PASS repeated failures rate-limited — 401,401,401,401,401,429
+PASS failed passwords never logged
+PASS admin can sign in — HTTP 200 {"ok":true,"email":"admin@clubboils.test"}
+PASS admin cookie is HttpOnly + Secure + SameSite
+PASS cross-site admin request blocked (CSRF) — HTTP 403
+PASS event exists
+PASS cutoff 9:30 AM Trinidad — 2026-10-15T13:30:00+00:00
+PASS collection 12:00–2:00 PM
+PASS event fee TT$0
+PASS starts without an access code
+PASS access-code hash never sent to browser
+PASS no one can enter before a code is set — HTTP 401
+PASS admin dashboard loads after sign-in
+PASS admin can set access code
+PASS code stored as scrypt hash only
+PASS plain code not in audit log
+PASS admin can hide an item for the event — {"data":{"id":"17e42bfa-3d86-44cb-9ebb-4e3f5f7e899c","slug":"arthur-lok-jack-oct-15-2026","school_name":"Arthur Lok Jack
+PASS unchanged schedule needs no confirmation
+PASS schedule change requires confirmation — HTTP 409
+PASS wrong code rejected server-side
+PASS repeated wrong codes rate-limited — 401,401,401,401,401,401,401,401,429
+PASS ordering without a session is refused
+PASS correct code accepted (case-insensitive)
+PASS event cookie HttpOnly + Secure + SameSite
+PASS code absent from page HTML
+PASS page is noindex
+PASS X-Robots-Tag noindex header
+PASS session for one event does not open another (even with a copied cookie)
+PASS policy version exposed to the student page — arthur-lok-jack-oct-15-2026-IQTN-rup
+PASS full active menu shown (incl. lobster) — 21 items
+PASS event-hidden item not shown
+PASS item switched off site-wide not shown
+PASS manipulated price rejected — HTTP 409
+PASS hidden item rejected — HTTP 409
+PASS unknown item rejected — HTTP 409
+PASS acknowledgement required server-side
+PASS Trinidad phone validated
+PASS email required for bank transfer
+PASS event order placed — HTTP 201 total 455
+PASS retry does not duplicate
+PASS exactly one row for retried order
+PASS saved as school-event collection, no address, no delivery fee — school_event_collection|school_event_collection|2026-10-15|∅|0.00|pending_payment|0.00|true|arthur-lok-jack-oct-15-2026-IQTN-rup
+PASS cash order unpaid until recorded — school_event_collection|school_event_collection|2026-10-15|∅|0.00|pending_payment|0.00|true|arthur-lok-jack-oct-15-2026-IQTN-rup
+PASS acknowledgement saved with version — school_event_collection|school_event_collection|2026-10-15|∅|0.00|pending_payment|0.00|true|arthur-lok-jack-oct-15-2026-IQTN-rup
+PASS acknowledging outdated terms is refused
+PASS item snapshot stored
+PASS bank-transfer order awaits verification
+PASS regular order accepted with server price — HTTP 201 {"order":{"orderNumber":"CB-01003","total":100,"subtotal":100,"deliveryFee":0,"serviceFee":0,"paymentMethod":"cash_on_de
+PASS regular order with manipulated total rejected
+PASS regular delivery keeps TT$30 fee — {"order":{"orderNumber":"CB-01004","total":130,"subtotal":100,"deliveryFee":30,"serviceFee":0,"payme
+PASS banner text — ARTHUR LOK JACK SCHOOL EVENT — Order your Club Boils for Thursday, October 15. Orders close at 9:30 AM. All orders will be available at the school between 12:00 PM and 2:00 PM.Closes in 5d 18h 40m
+PASS hidden item absent in UI
+PASS cart shows event and collection window — EventArthur Lok Jack - 15 Oct 2026School Collection12:00 PM-2:00 PM
+PASS no delivery address field on event checkout
+PASS confirmation shows order no., event, window, total, method, balance — 🎉Order receivedOrder number CB-01005EventArthur Lok Jack - 15 Oct 2026School Collection12:00 PM-2:00 PMSchoolArthur Lok Jack Global School of BusinessCollectionThursday, October 15, 2026, 12:00 PM–2:
+PASS no horizontal scrolling on iPhone width
+PASS mark collected
+PASS collected order still unpaid
+PASS undo collection needs a reason
+PASS correction audited
+PASS Record Cash Received marks paid
+PASS double-submit records cash once
+PASS payment saved with who/when
+PASS bank order still awaiting verification
+PASS bank transfer confirmed by admin
+PASS bank confirmation saved reference
+PASS payment status cannot be edited directly
+PASS event order total locked
+PASS dashboard order value = sum of orders — 995 vs 995
+PASS cash + bank + unpaid reconcile — {"totalOrders":3,"cancelledOrders":0,"foodRevenue":995,"eventFees":0,"orderValue":995,"expectedRevenue":540,"earnedRevenue":455,"onlinePaid":320,"cashExpected":675,"cashReceived":455,"otherReceived":0,"collectedTotal":775,"unpaidBalance":220,"refunded":0,"reconciles":true}
+PASS prep totals match order lines — 6 vs 6
+PASS prep list shows allergy notes
+PASS collection search by student ID
+PASS event orders appear once in the shared orders list
+PASS scheduled in the week of Oct 12–18
+PASS accounts page loads for signed-in admin
+PASS admin can switch an item off
+PASS switched-off item gone from event menu
+PASS main menu renders from shared menu
+PASS switched-off item gone from main menu
+PASS switched-off item cannot be ordered — HTTP 409 Shrimp Alfredo Ramen Boil (Shrimp, ramen noodles, homemade Alfredo sauce, sausage, boiled egg & corn) is not available right now.
+PASS earlier order snapshot unchanged
+PASS duplicate creates a draft
+PASS orders accepted before cutoff — HTTP 201
+PASS page switches to read-only at cutoff
+PASS API refuses orders after cutoff — HTTP 409
+PASS revoked student session no longer has access
+PASS admin signed out
+PASS access code not in server log
+PASS admin password not in server log
+PASS service-role key not in server log
+PASS service-role key not in browser JS
+PASS old admin password removed from browser JS
+
+114/114 checks passed

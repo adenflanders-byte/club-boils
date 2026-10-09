@@ -1,0 +1,106 @@
+TAP version 13
+# Subtest: every catalogue id is unique and stable
+ok 1 - every catalogue id is unique and stable
+  ---
+  duration_ms: 1.352946
+  type: 'test'
+  ...
+# Subtest: prices come from the menu, never from the request
+ok 2 - prices come from the menu, never from the request
+  ---
+  duration_ms: 0.514911
+  type: 'test'
+  ...
+# Subtest: add-ons are priced per unit and only allowed on boils
+ok 3 - add-ons are priced per unit and only allowed on boils
+  ---
+  duration_ms: 0.281806
+  type: 'test'
+  ...
+# Subtest: build your own: seafood + extras + heat, duo prices
+ok 4 - build your own: seafood + extras + heat, duo prices
+  ---
+  duration_ms: 0.499412
+  type: 'test'
+  ...
+# Subtest: manipulated or unknown items, quantities and extras are rejected
+ok 5 - manipulated or unknown items, quantities and extras are rejected
+  ---
+  duration_ms: 0.323434
+  type: 'test'
+  ...
+# Subtest: items switched off in Admin, or hidden for an event, cannot be ordered
+ok 6 - items switched off in Admin, or hidden for an event, cannot be ordered
+  ---
+  duration_ms: 0.48195
+  type: 'test'
+  ...
+# Subtest: a menu price change shows up everywhere but not in an existing snapshot
+ok 7 - a menu price change shows up everywhere but not in an existing snapshot
+  ---
+  duration_ms: 0.331299
+  type: 'test'
+  ...
+# Subtest: describeLine matches the old kitchen text
+ok 8 - describeLine matches the old kitchen text
+  ---
+  duration_ms: 0.14494
+  type: 'test'
+  ...
+# Subtest: Trinidad time: event cutoff is 9:30 AM AST regardless of server timezone
+ok 9 - Trinidad time: event cutoff is 9:30 AM AST regardless of server timezone
+  ---
+  duration_ms: 14.484823
+  type: 'test'
+  ...
+# Subtest: regular order days close at 8 PM the night before
+ok 10 - regular order days close at 8 PM the night before
+  ---
+  duration_ms: 1.019564
+  type: 'test'
+  ...
+# Subtest: Trinidad phone numbers
+ok 11 - Trinidad phone numbers
+  ---
+  duration_ms: 0.324136
+  type: 'test'
+  ...
+# Subtest: email and text cleaning
+ok 12 - email and text cleaning
+  ---
+  duration_ms: 0.277128
+  type: 'test'
+  ...
+# Subtest: payments start unpaid; old orders keep their method
+ok 13 - payments start unpaid; old orders keep their method
+  ---
+  duration_ms: 0.25172
+  type: 'test'
+  ...
+# Subtest: session tokens: signed, typed, expiring
+ok 14 - session tokens: signed, typed, expiring
+  ---
+  duration_ms: 0.841782
+  type: 'test'
+  ...
+# Subtest: access codes are salted scrypt hashes, never stored plain
+ok 15 - access codes are salted scrypt hashes, never stored plain
+  ---
+  duration_ms: 210.78708
+  type: 'test'
+  ...
+# Subtest: event form: Trinidad times, default policy text matches the brief
+ok 16 - event form: Trinidad times, default policy text matches the brief
+  ---
+  duration_ms: 29.909842
+  type: 'test'
+  ...
+1..16
+# tests 16
+# suites 0
+# pass 16
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 586.115092
