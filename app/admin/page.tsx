@@ -60,6 +60,8 @@ export default function AdminPage() {
   const [editStatus,     setEditStatus]     = useState<OrderStatus>("new");
   const [editSaving,     setEditSaving]     = useState(false);
   const [editSaved,      setEditSaved]      = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState<Record<string, boolean>>({});
+  const [statusError,    setStatusError]    = useState<string | null>(null);
   const [showEditConfirm,setShowEditConfirm]= useState(false);
   const [editBefore,     setEditBefore]     = useState<Partial<Order> | null>(null);
 
@@ -191,8 +193,21 @@ export default function AdminPage() {
   async function advanceStatus(id: string, currentStatus: OrderStatus) {
     const next = STATUS_CONFIG[currentStatus].next;
     if (!next) return;
-    await supabase.from("orders").update({ status: next }).eq("id", id);
+    if (updatingStatus[id]) return; // prevent double-click
+    // Optimistic update
+    setUpdatingStatus(prev => ({ ...prev, [id]: true }));
+    setStatusError(null);
     setOrders(prev => prev.map(o => o.id === id ? { ...o, status: next } : o));
+    try {
+      const { error } = await supabase.from("orders").update({ status: next }).eq("id", id);
+      if (error) throw error;
+    } catch {
+      // Revert on failure
+      setOrders(prev => prev.map(o => o.id === id ? { ...o, status: currentStatus } : o));
+      setStatusError(`Failed to update order status. Please try again.`);
+    } finally {
+      setUpdatingStatus(prev => { const n = { ...prev }; delete n[id]; return n; });
+    }
   }
 
   async function deleteOrder(id: string) {
@@ -411,6 +426,14 @@ export default function AdminPage() {
         ::-webkit-scrollbar-thumb { background: ${C.gold}; border-radius: 2px; }
       `}</style>
       <main style={{ backgroundColor: C.cream, minHeight: "100vh", fontFamily: FONT_BODY, color: C.charcoal }}>
+
+        {/* Status error toast */}
+        {statusError && (
+          <div style={{ position: "fixed", bottom: "24px", left: "50%", transform: "translateX(-50%)", zIndex: 9999, backgroundColor: "#1C1C1C", color: "#FFF", padding: "12px 20px", borderRadius: "6px", border: "1px solid #C0392B", fontSize: "13px", fontFamily: FONT_BODY, display: "flex", alignItems: "center", gap: "12px", boxShadow: "0 8px 32px rgba(0,0,0,0.4)" }}>
+            <span>⚠️ {statusError}</span>
+            <button onClick={() => setStatusError(null)} style={{ background: "none", border: "none", color: "#AAA", cursor: "pointer", fontSize: "16px", lineHeight: 1 }}>✕</button>
+          </div>
+        )}
 
         {/* Header */}
         <header style={{ backgroundColor: C.black, padding: "0 clamp(16px,3vw,32px)", display: "flex", justifyContent: "space-between", alignItems: "center", height: "64px", position: "sticky", top: 0, zIndex: 100, borderBottom: `1px solid ${C.border}` }}>
@@ -793,7 +816,7 @@ export default function AdminPage() {
                           <button onClick={() => startEdit(order)} style={{ backgroundColor: C.white, color: C.charcoal, padding: "9px 18px", borderRadius: "4px", border: `1px solid ${C.border}`, fontFamily: FONT_BODY, fontWeight: "600", fontSize: "12px", cursor: "pointer" }}>✏️ Edit Order</button>
                         )}
                         {cfg2.next && (
-                          <button onClick={() => advanceStatus(order.id, order.status)} style={{ background: `linear-gradient(135deg, ${C.gold}, #E8B84B)`, color: C.black, padding: "9px 18px", borderRadius: "4px", border: "none", fontFamily: FONT_BODY, fontWeight: "700", fontSize: "12px", cursor: "pointer" }}>{cfg2.nextLabel}</button>
+                          <button onClick={() => advanceStatus(order.id, order.status)} disabled={!!updatingStatus[order.id]} style={{ background: updatingStatus[order.id] ? "rgba(196,149,42,0.4)" : `linear-gradient(135deg, ${C.gold}, #E8B84B)`, color: C.black, padding: "9px 18px", borderRadius: "4px", border: "none", fontFamily: FONT_BODY, fontWeight: "700", fontSize: "12px", cursor: updatingStatus[order.id] ? "not-allowed" : "pointer", opacity: updatingStatus[order.id] ? 0.7 : 1 }}>{updatingStatus[order.id] ? "Updating…" : cfg2.nextLabel}</button>
                         )}
                         <a href={`tel:${order.phone}`} style={{ backgroundColor: C.white, color: C.charcoal, padding: "9px 18px", borderRadius: "4px", border: `1px solid ${C.border}`, fontFamily: FONT_BODY, fontWeight: "600", fontSize: "12px", textDecoration: "none", display: "inline-flex", alignItems: "center" }}>📞 Call</a>
                         <button onClick={() => deleteOrder(order.id)} style={{ backgroundColor: C.white, color: "#C0392B", padding: "9px 18px", borderRadius: "4px", border: "1px solid #F5C6C6", fontFamily: FONT_BODY, fontWeight: "500", fontSize: "12px", cursor: "pointer" }}>🗑 Delete</button>
@@ -1077,7 +1100,7 @@ export default function AdminPage() {
                                           <button onClick={() => startEdit(order)} style={{ backgroundColor: C.white, color: C.charcoal, padding: "9px 18px", borderRadius: "4px", border: `1px solid ${C.border}`, fontFamily: FONT_BODY, fontWeight: "600", fontSize: "12px", cursor: "pointer" }}>✏️ Edit Order</button>
                                         )}
                                         {cfg2.next && (
-                                          <button onClick={() => advanceStatus(order.id, order.status)} style={{ background: `linear-gradient(135deg, ${C.gold}, #E8B84B)`, color: C.black, padding: "9px 18px", borderRadius: "4px", border: "none", fontFamily: FONT_BODY, fontWeight: "700", fontSize: "12px", cursor: "pointer" }}>{cfg2.nextLabel}</button>
+                                          <button onClick={() => advanceStatus(order.id, order.status)} disabled={!!updatingStatus[order.id]} style={{ background: updatingStatus[order.id] ? "rgba(196,149,42,0.4)" : `linear-gradient(135deg, ${C.gold}, #E8B84B)`, color: C.black, padding: "9px 18px", borderRadius: "4px", border: "none", fontFamily: FONT_BODY, fontWeight: "700", fontSize: "12px", cursor: updatingStatus[order.id] ? "not-allowed" : "pointer", opacity: updatingStatus[order.id] ? 0.7 : 1 }}>{updatingStatus[order.id] ? "Updating…" : cfg2.nextLabel}</button>
                                         )}
                                         <a href={`tel:${order.phone}`} style={{ backgroundColor: C.white, color: C.charcoal, padding: "9px 18px", borderRadius: "4px", border: `1px solid ${C.border}`, fontFamily: FONT_BODY, fontWeight: "600", fontSize: "12px", textDecoration: "none", display: "inline-flex", alignItems: "center" }}>📞 Call</a>
                                         <button onClick={() => deleteOrder(order.id)} style={{ backgroundColor: C.white, color: "#C0392B", padding: "9px 18px", borderRadius: "4px", border: "1px solid #F5C6C6", fontFamily: FONT_BODY, fontWeight: "500", fontSize: "12px", cursor: "pointer" }}>🗑 Delete</button>
