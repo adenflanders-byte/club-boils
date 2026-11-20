@@ -6,6 +6,7 @@ type OrderStatus = "new" | "confirmed" | "ready" | "completed" | "cancelled";
 interface Order {
   id: string;
   created_at: string;
+  fulfilment_date?: string | null; // ISO date e.g. "2026-11-20" — proper service date
   name: string;
   phone: string;
   email: string | null;
@@ -285,6 +286,8 @@ export default function AdminPage() {
   }
 
   function getFulfilmentDate(order: Order): string | null {
+    // Prefer the proper DB column; fall back to deriving from notes (legacy orders)
+    if (order.fulfilment_date) return order.fulfilment_date;
     if (!order.notes) return null;
     const m = order.notes.match(/Day:\s*(Thursday|Friday|Saturday)/i);
     if (!m) return null;
@@ -296,6 +299,23 @@ export default function AdminPage() {
     const result = new Date(baseTT);
     result.setDate(baseTT.getDate() + diff);
     return result.toISOString().split("T")[0];
+  }
+
+  // Returns a proximity badge label for a fulfilment date ISO string relative to now (TT time)
+  function getFulfilmentBadge(isoDate: string): { label: string; color: string; bg: string } | null {
+    const nowTT = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Port_of_Spain" }));
+    const todayISO = nowTT.toISOString().split("T")[0];
+    const tomorrowISO = (() => { const d = new Date(nowTT); d.setDate(d.getDate() + 1); return d.toISOString().split("T")[0]; })();
+    const thisMonday = (() => { const d = new Date(nowTT); const diff = d.getDay() === 0 ? -6 : 1 - d.getDay(); d.setDate(d.getDate() + diff); d.setHours(0,0,0,0); return d; })();
+    const thisSunday = new Date(thisMonday); thisSunday.setDate(thisMonday.getDate() + 6);
+    const nextMonday = new Date(thisMonday); nextMonday.setDate(thisMonday.getDate() + 7);
+    const nextSunday = new Date(nextMonday); nextSunday.setDate(nextMonday.getDate() + 6);
+    const fd = new Date(isoDate + "T12:00:00-04:00");
+    if (isoDate === todayISO) return { label: "Same Day", color: "#A03030", bg: "#FFECEC" };
+    if (isoDate === tomorrowISO) return { label: "Tomorrow", color: "#B8600A", bg: "#FFF8EC" };
+    if (fd >= thisMonday && fd <= thisSunday) return { label: "This Week", color: "#1A56A4", bg: "#EBF3FF" };
+    if (fd >= nextMonday && fd <= nextSunday) return { label: "Next Week", color: "#6B3FA0", bg: "#F3ECFF" };
+    return null;
   }
 
   function exportToPDF() {
@@ -793,11 +813,18 @@ export default function AdminPage() {
                       <p style={{ fontWeight: "600", fontSize: "15px", color: C.black }}>{order.name}</p>
                       <p style={{ fontSize: "12px", color: C.muted, marginTop: "2px" }}>{order.package}</p>
                     </div>
-                    {order.notes && order.notes.includes("Day:") && (
-                      <span style={{ backgroundColor: "#EBF3FF", color: "#1A56A4", fontSize: "11px", fontWeight: "700", padding: "3px 10px", borderRadius: "20px", whiteSpace: "nowrap" as const }}>
-                        📅 {order.notes.match(/Day: (\w+)/)?.[1] || ""}
-                      </span>
-                    )}
+                    {(() => {
+                      const fd = getFulfilmentDate(order);
+                      const badge = fd ? getFulfilmentBadge(fd) : null;
+                      const dayName = order.notes?.match(/Day: (\w+)/)?.[1];
+                      const displayDate = fd ? new Date(fd + "T12:00:00-04:00").toLocaleDateString("en-TT", { weekday: "short", month: "short", day: "numeric" }) : dayName;
+                      return displayDate ? (
+                        <span style={{ display: "flex", alignItems: "center", gap: "5px", flexWrap: "nowrap" as const }}>
+                          {badge && <span style={{ backgroundColor: badge.bg, color: badge.color, fontSize: "9px", fontWeight: "800", letterSpacing: "0.1em", padding: "2px 7px", borderRadius: "20px", textTransform: "uppercase" as const }}>{badge.label}</span>}
+                          <span style={{ fontSize: "11px", color: C.muted }}>📅 {displayDate}</span>
+                        </span>
+                      ) : null;
+                    })()}
                     <span style={{ fontSize: "13px", color: C.muted, whiteSpace: "nowrap" as const }}>{order.fulfillment === "delivery" ? "🚗 Delivery" : "🏠 Pickup"}</span>
                     <span style={{ fontFamily: FONT_DISPLAY, fontSize: "17px", color: C.black, whiteSpace: "nowrap" as const }}>TT${order.total}</span>
                     <span style={{ color: C.muted, fontSize: "18px" }}>{isExpanded2 ? "▲" : "▼"}</span>
@@ -808,6 +835,7 @@ export default function AdminPage() {
                         <p><strong>Phone:</strong> <a href={`tel:${order.phone}`} style={{ color: C.gold }}>{order.phone}</a></p>
                         {order.email && <p><strong>Email:</strong> {order.email}</p>}
                         {order.address && <p><strong>Address:</strong> {order.address}</p>}
+                        {getFulfilmentDate(order) && <p><strong>Service date:</strong> {new Date(getFulfilmentDate(order)! + "T12:00:00-04:00").toLocaleDateString("en-TT", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</p>}
                         {(order.details || []).map((d, i) => <p key={i} style={{ color: C.charcoal }}>· {d}</p>)}
                         {order.notes && <p style={{ backgroundColor: "#FFFBE6", border: "1px solid #F0C04A", borderRadius: "4px", padding: "8px 12px", marginTop: "4px" }}>{order.notes}</p>}
                       </div>
@@ -1077,11 +1105,18 @@ export default function AdminPage() {
                                       <p style={{ fontWeight: "600", fontSize: "15px", color: C.black }}>{order.name}</p>
                                       <p style={{ fontSize: "12px", color: C.muted, marginTop: "2px" }}>{order.package}</p>
                                     </div>
-                                    {order.notes && order.notes.includes("Day:") && (
-                                      <span style={{ backgroundColor: "#EBF3FF", color: "#1A56A4", fontSize: "11px", fontWeight: "700", padding: "3px 10px", borderRadius: "20px", whiteSpace: "nowrap" as const }}>
-                                        📅 {order.notes.match(/Day: (\w+)/)?.[1] || ""}
-                                      </span>
-                                    )}
+                                    {(() => {
+                                      const fd = getFulfilmentDate(order);
+                                      const badge = fd ? getFulfilmentBadge(fd) : null;
+                                      const dayName = order.notes?.match(/Day: (\w+)/)?.[1];
+                                      const displayDate = fd ? new Date(fd + "T12:00:00-04:00").toLocaleDateString("en-TT", { weekday: "short", month: "short", day: "numeric" }) : dayName;
+                                      return displayDate ? (
+                                        <span style={{ display: "flex", alignItems: "center", gap: "5px", flexWrap: "nowrap" as const }}>
+                                          {badge && <span style={{ backgroundColor: badge.bg, color: badge.color, fontSize: "9px", fontWeight: "800", letterSpacing: "0.1em", padding: "2px 7px", borderRadius: "20px", textTransform: "uppercase" as const }}>{badge.label}</span>}
+                                          <span style={{ fontSize: "11px", color: C.muted }}>📅 {displayDate}</span>
+                                        </span>
+                                      ) : null;
+                                    })()}
                                     <span style={{ fontSize: "13px", color: C.muted, whiteSpace: "nowrap" as const }}>{order.fulfillment === "delivery" ? "🚗 Delivery" : "🏠 Pickup"}</span>
                                     <span style={{ fontFamily: FONT_DISPLAY, fontSize: "17px", color: C.black, whiteSpace: "nowrap" as const }}>TT${order.total}</span>
                                     <span style={{ color: C.muted, fontSize: "18px" }}>{isExpanded2 ? "▲" : "▼"}</span>
@@ -1092,6 +1127,7 @@ export default function AdminPage() {
                                         <p><strong>Phone:</strong> <a href={`tel:${order.phone}`} style={{ color: C.gold }}>{order.phone}</a></p>
                                         {order.email && <p><strong>Email:</strong> {order.email}</p>}
                                         {order.address && <p><strong>Address:</strong> {order.address}</p>}
+                                        {getFulfilmentDate(order) && <p><strong>Service date:</strong> {new Date(getFulfilmentDate(order)! + "T12:00:00-04:00").toLocaleDateString("en-TT", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</p>}
                                         {(order.details || []).map((d, i) => <p key={i} style={{ color: C.charcoal }}>· {d}</p>)}
                                         {order.notes && <p style={{ backgroundColor: "#FFFBE6", border: "1px solid #F0C04A", borderRadius: "4px", padding: "8px 12px", marginTop: "4px" }}>{order.notes}</p>}
                                       </div>
