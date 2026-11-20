@@ -6,7 +6,6 @@ type OrderStatus = "new" | "confirmed" | "ready" | "completed" | "cancelled";
 interface Order {
   id: string;
   created_at: string;
-  fulfilment_date?: string | null; // ISO date e.g. "2026-11-20" — proper service date
   name: string;
   phone: string;
   email: string | null;
@@ -61,8 +60,6 @@ export default function AdminPage() {
   const [editStatus,     setEditStatus]     = useState<OrderStatus>("new");
   const [editSaving,     setEditSaving]     = useState(false);
   const [editSaved,      setEditSaved]      = useState(false);
-  const [updatingStatus, setUpdatingStatus] = useState<Record<string, boolean>>({});
-  const [statusError,    setStatusError]    = useState<string | null>(null);
   const [showEditConfirm,setShowEditConfirm]= useState(false);
   const [editBefore,     setEditBefore]     = useState<Partial<Order> | null>(null);
 
@@ -194,21 +191,8 @@ export default function AdminPage() {
   async function advanceStatus(id: string, currentStatus: OrderStatus) {
     const next = STATUS_CONFIG[currentStatus].next;
     if (!next) return;
-    if (updatingStatus[id]) return; // prevent double-click
-    // Optimistic update
-    setUpdatingStatus(prev => ({ ...prev, [id]: true }));
-    setStatusError(null);
+    await supabase.from("orders").update({ status: next }).eq("id", id);
     setOrders(prev => prev.map(o => o.id === id ? { ...o, status: next } : o));
-    try {
-      const { error } = await supabase.from("orders").update({ status: next }).eq("id", id);
-      if (error) throw error;
-    } catch {
-      // Revert on failure
-      setOrders(prev => prev.map(o => o.id === id ? { ...o, status: currentStatus } : o));
-      setStatusError(`Failed to update order status. Please try again.`);
-    } finally {
-      setUpdatingStatus(prev => { const n = { ...prev }; delete n[id]; return n; });
-    }
   }
 
   async function deleteOrder(id: string) {
@@ -286,8 +270,6 @@ export default function AdminPage() {
   }
 
   function getFulfilmentDate(order: Order): string | null {
-    // Prefer the proper DB column; fall back to deriving from notes (legacy orders)
-    if (order.fulfilment_date) return order.fulfilment_date;
     if (!order.notes) return null;
     const m = order.notes.match(/Day:\s*(Thursday|Friday|Saturday)/i);
     if (!m) return null;
@@ -299,23 +281,6 @@ export default function AdminPage() {
     const result = new Date(baseTT);
     result.setDate(baseTT.getDate() + diff);
     return result.toISOString().split("T")[0];
-  }
-
-  // Returns a proximity badge label for a fulfilment date ISO string relative to now (TT time)
-  function getFulfilmentBadge(isoDate: string): { label: string; color: string; bg: string } | null {
-    const nowTT = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Port_of_Spain" }));
-    const todayISO = nowTT.toISOString().split("T")[0];
-    const tomorrowISO = (() => { const d = new Date(nowTT); d.setDate(d.getDate() + 1); return d.toISOString().split("T")[0]; })();
-    const thisMonday = (() => { const d = new Date(nowTT); const diff = d.getDay() === 0 ? -6 : 1 - d.getDay(); d.setDate(d.getDate() + diff); d.setHours(0,0,0,0); return d; })();
-    const thisSunday = new Date(thisMonday); thisSunday.setDate(thisMonday.getDate() + 6);
-    const nextMonday = new Date(thisMonday); nextMonday.setDate(thisMonday.getDate() + 7);
-    const nextSunday = new Date(nextMonday); nextSunday.setDate(nextMonday.getDate() + 6);
-    const fd = new Date(isoDate + "T12:00:00-04:00");
-    if (isoDate === todayISO) return { label: "Same Day", color: "#A03030", bg: "#FFECEC" };
-    if (isoDate === tomorrowISO) return { label: "Tomorrow", color: "#B8600A", bg: "#FFF8EC" };
-    if (fd >= thisMonday && fd <= thisSunday) return { label: "This Week", color: "#1A56A4", bg: "#EBF3FF" };
-    if (fd >= nextMonday && fd <= nextSunday) return { label: "Next Week", color: "#6B3FA0", bg: "#F3ECFF" };
-    return null;
   }
 
   function exportToPDF() {
@@ -446,14 +411,6 @@ export default function AdminPage() {
         ::-webkit-scrollbar-thumb { background: ${C.gold}; border-radius: 2px; }
       `}</style>
       <main style={{ backgroundColor: C.cream, minHeight: "100vh", fontFamily: FONT_BODY, color: C.charcoal }}>
-
-        {/* Status error toast */}
-        {statusError && (
-          <div style={{ position: "fixed", bottom: "24px", left: "50%", transform: "translateX(-50%)", zIndex: 9999, backgroundColor: "#1C1C1C", color: "#FFF", padding: "12px 20px", borderRadius: "6px", border: "1px solid #C0392B", fontSize: "13px", fontFamily: FONT_BODY, display: "flex", alignItems: "center", gap: "12px", boxShadow: "0 8px 32px rgba(0,0,0,0.4)" }}>
-            <span>⚠️ {statusError}</span>
-            <button onClick={() => setStatusError(null)} style={{ background: "none", border: "none", color: "#AAA", cursor: "pointer", fontSize: "16px", lineHeight: 1 }}>✕</button>
-          </div>
-        )}
 
         {/* Header */}
         <header style={{ backgroundColor: C.black, padding: "0 clamp(16px,3vw,32px)", display: "flex", justifyContent: "space-between", alignItems: "center", height: "64px", position: "sticky", top: 0, zIndex: 100, borderBottom: `1px solid ${C.border}` }}>
@@ -813,18 +770,11 @@ export default function AdminPage() {
                       <p style={{ fontWeight: "600", fontSize: "15px", color: C.black }}>{order.name}</p>
                       <p style={{ fontSize: "12px", color: C.muted, marginTop: "2px" }}>{order.package}</p>
                     </div>
-                    {(() => {
-                      const fd = getFulfilmentDate(order);
-                      const badge = fd ? getFulfilmentBadge(fd) : null;
-                      const dayName = order.notes?.match(/Day: (\w+)/)?.[1];
-                      const displayDate = fd ? new Date(fd + "T12:00:00-04:00").toLocaleDateString("en-TT", { weekday: "short", month: "short", day: "numeric" }) : dayName;
-                      return displayDate ? (
-                        <span style={{ display: "flex", alignItems: "center", gap: "5px", flexWrap: "nowrap" as const }}>
-                          {badge && <span style={{ backgroundColor: badge.bg, color: badge.color, fontSize: "9px", fontWeight: "800", letterSpacing: "0.1em", padding: "2px 7px", borderRadius: "20px", textTransform: "uppercase" as const }}>{badge.label}</span>}
-                          <span style={{ fontSize: "11px", color: C.muted }}>📅 {displayDate}</span>
-                        </span>
-                      ) : null;
-                    })()}
+                    {order.notes && order.notes.includes("Day:") && (
+                      <span style={{ backgroundColor: "#EBF3FF", color: "#1A56A4", fontSize: "11px", fontWeight: "700", padding: "3px 10px", borderRadius: "20px", whiteSpace: "nowrap" as const }}>
+                        📅 {order.notes.match(/Day: (\w+)/)?.[1] || ""}
+                      </span>
+                    )}
                     <span style={{ fontSize: "13px", color: C.muted, whiteSpace: "nowrap" as const }}>{order.fulfillment === "delivery" ? "🚗 Delivery" : "🏠 Pickup"}</span>
                     <span style={{ fontFamily: FONT_DISPLAY, fontSize: "17px", color: C.black, whiteSpace: "nowrap" as const }}>TT${order.total}</span>
                     <span style={{ color: C.muted, fontSize: "18px" }}>{isExpanded2 ? "▲" : "▼"}</span>
@@ -835,7 +785,6 @@ export default function AdminPage() {
                         <p><strong>Phone:</strong> <a href={`tel:${order.phone}`} style={{ color: C.gold }}>{order.phone}</a></p>
                         {order.email && <p><strong>Email:</strong> {order.email}</p>}
                         {order.address && <p><strong>Address:</strong> {order.address}</p>}
-                        {getFulfilmentDate(order) && <p><strong>Service date:</strong> {new Date(getFulfilmentDate(order)! + "T12:00:00-04:00").toLocaleDateString("en-TT", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</p>}
                         {(order.details || []).map((d, i) => <p key={i} style={{ color: C.charcoal }}>· {d}</p>)}
                         {order.notes && <p style={{ backgroundColor: "#FFFBE6", border: "1px solid #F0C04A", borderRadius: "4px", padding: "8px 12px", marginTop: "4px" }}>{order.notes}</p>}
                       </div>
@@ -844,7 +793,7 @@ export default function AdminPage() {
                           <button onClick={() => startEdit(order)} style={{ backgroundColor: C.white, color: C.charcoal, padding: "9px 18px", borderRadius: "4px", border: `1px solid ${C.border}`, fontFamily: FONT_BODY, fontWeight: "600", fontSize: "12px", cursor: "pointer" }}>✏️ Edit Order</button>
                         )}
                         {cfg2.next && (
-                          <button onClick={() => advanceStatus(order.id, order.status)} disabled={!!updatingStatus[order.id]} style={{ background: updatingStatus[order.id] ? "rgba(196,149,42,0.4)" : `linear-gradient(135deg, ${C.gold}, #E8B84B)`, color: C.black, padding: "9px 18px", borderRadius: "4px", border: "none", fontFamily: FONT_BODY, fontWeight: "700", fontSize: "12px", cursor: updatingStatus[order.id] ? "not-allowed" : "pointer", opacity: updatingStatus[order.id] ? 0.7 : 1 }}>{updatingStatus[order.id] ? "Updating…" : cfg2.nextLabel}</button>
+                          <button onClick={() => advanceStatus(order.id, order.status)} style={{ background: `linear-gradient(135deg, ${C.gold}, #E8B84B)`, color: C.black, padding: "9px 18px", borderRadius: "4px", border: "none", fontFamily: FONT_BODY, fontWeight: "700", fontSize: "12px", cursor: "pointer" }}>{cfg2.nextLabel}</button>
                         )}
                         <a href={`tel:${order.phone}`} style={{ backgroundColor: C.white, color: C.charcoal, padding: "9px 18px", borderRadius: "4px", border: `1px solid ${C.border}`, fontFamily: FONT_BODY, fontWeight: "600", fontSize: "12px", textDecoration: "none", display: "inline-flex", alignItems: "center" }}>📞 Call</a>
                         <button onClick={() => deleteOrder(order.id)} style={{ backgroundColor: C.white, color: "#C0392B", padding: "9px 18px", borderRadius: "4px", border: "1px solid #F5C6C6", fontFamily: FONT_BODY, fontWeight: "500", fontSize: "12px", cursor: "pointer" }}>🗑 Delete</button>
@@ -1105,18 +1054,11 @@ export default function AdminPage() {
                                       <p style={{ fontWeight: "600", fontSize: "15px", color: C.black }}>{order.name}</p>
                                       <p style={{ fontSize: "12px", color: C.muted, marginTop: "2px" }}>{order.package}</p>
                                     </div>
-                                    {(() => {
-                                      const fd = getFulfilmentDate(order);
-                                      const badge = fd ? getFulfilmentBadge(fd) : null;
-                                      const dayName = order.notes?.match(/Day: (\w+)/)?.[1];
-                                      const displayDate = fd ? new Date(fd + "T12:00:00-04:00").toLocaleDateString("en-TT", { weekday: "short", month: "short", day: "numeric" }) : dayName;
-                                      return displayDate ? (
-                                        <span style={{ display: "flex", alignItems: "center", gap: "5px", flexWrap: "nowrap" as const }}>
-                                          {badge && <span style={{ backgroundColor: badge.bg, color: badge.color, fontSize: "9px", fontWeight: "800", letterSpacing: "0.1em", padding: "2px 7px", borderRadius: "20px", textTransform: "uppercase" as const }}>{badge.label}</span>}
-                                          <span style={{ fontSize: "11px", color: C.muted }}>📅 {displayDate}</span>
-                                        </span>
-                                      ) : null;
-                                    })()}
+                                    {order.notes && order.notes.includes("Day:") && (
+                                      <span style={{ backgroundColor: "#EBF3FF", color: "#1A56A4", fontSize: "11px", fontWeight: "700", padding: "3px 10px", borderRadius: "20px", whiteSpace: "nowrap" as const }}>
+                                        📅 {order.notes.match(/Day: (\w+)/)?.[1] || ""}
+                                      </span>
+                                    )}
                                     <span style={{ fontSize: "13px", color: C.muted, whiteSpace: "nowrap" as const }}>{order.fulfillment === "delivery" ? "🚗 Delivery" : "🏠 Pickup"}</span>
                                     <span style={{ fontFamily: FONT_DISPLAY, fontSize: "17px", color: C.black, whiteSpace: "nowrap" as const }}>TT${order.total}</span>
                                     <span style={{ color: C.muted, fontSize: "18px" }}>{isExpanded2 ? "▲" : "▼"}</span>
@@ -1127,7 +1069,6 @@ export default function AdminPage() {
                                         <p><strong>Phone:</strong> <a href={`tel:${order.phone}`} style={{ color: C.gold }}>{order.phone}</a></p>
                                         {order.email && <p><strong>Email:</strong> {order.email}</p>}
                                         {order.address && <p><strong>Address:</strong> {order.address}</p>}
-                                        {getFulfilmentDate(order) && <p><strong>Service date:</strong> {new Date(getFulfilmentDate(order)! + "T12:00:00-04:00").toLocaleDateString("en-TT", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</p>}
                                         {(order.details || []).map((d, i) => <p key={i} style={{ color: C.charcoal }}>· {d}</p>)}
                                         {order.notes && <p style={{ backgroundColor: "#FFFBE6", border: "1px solid #F0C04A", borderRadius: "4px", padding: "8px 12px", marginTop: "4px" }}>{order.notes}</p>}
                                       </div>
@@ -1136,7 +1077,7 @@ export default function AdminPage() {
                                           <button onClick={() => startEdit(order)} style={{ backgroundColor: C.white, color: C.charcoal, padding: "9px 18px", borderRadius: "4px", border: `1px solid ${C.border}`, fontFamily: FONT_BODY, fontWeight: "600", fontSize: "12px", cursor: "pointer" }}>✏️ Edit Order</button>
                                         )}
                                         {cfg2.next && (
-                                          <button onClick={() => advanceStatus(order.id, order.status)} disabled={!!updatingStatus[order.id]} style={{ background: updatingStatus[order.id] ? "rgba(196,149,42,0.4)" : `linear-gradient(135deg, ${C.gold}, #E8B84B)`, color: C.black, padding: "9px 18px", borderRadius: "4px", border: "none", fontFamily: FONT_BODY, fontWeight: "700", fontSize: "12px", cursor: updatingStatus[order.id] ? "not-allowed" : "pointer", opacity: updatingStatus[order.id] ? 0.7 : 1 }}>{updatingStatus[order.id] ? "Updating…" : cfg2.nextLabel}</button>
+                                          <button onClick={() => advanceStatus(order.id, order.status)} style={{ background: `linear-gradient(135deg, ${C.gold}, #E8B84B)`, color: C.black, padding: "9px 18px", borderRadius: "4px", border: "none", fontFamily: FONT_BODY, fontWeight: "700", fontSize: "12px", cursor: "pointer" }}>{cfg2.nextLabel}</button>
                                         )}
                                         <a href={`tel:${order.phone}`} style={{ backgroundColor: C.white, color: C.charcoal, padding: "9px 18px", borderRadius: "4px", border: `1px solid ${C.border}`, fontFamily: FONT_BODY, fontWeight: "600", fontSize: "12px", textDecoration: "none", display: "inline-flex", alignItems: "center" }}>📞 Call</a>
                                         <button onClick={() => deleteOrder(order.id)} style={{ backgroundColor: C.white, color: "#C0392B", padding: "9px 18px", borderRadius: "4px", border: "1px solid #F5C6C6", fontFamily: FONT_BODY, fontWeight: "500", fontSize: "12px", cursor: "pointer" }}>🗑 Delete</button>
