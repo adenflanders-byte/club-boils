@@ -980,7 +980,7 @@ export default function Home() {
                       <div>
                         <p style={{ ...labelStyle, marginBottom: "12px", color: gold }}>Step 4 — Heat Level</p>
                         <div style={{ display: "flex", gap: "8px" }}>
-                          {HEATS.map(h => <button key={h.id} onClick={() => setBuildHeat(h.id as Heat)} style={heatBtn(h.id)}>{h.emoji} {h.label}</button>)}
+                          {HEATS.map(h => <button key={h.id} onClick={() => setBuildHeat(h.id as Heat)} style={heatBtn(h.id)}>{h.label}</button>)}
                         </div>
                       </div>
                       <div style={{ backgroundColor: black, borderRadius: "4px", padding: "24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -1048,7 +1048,7 @@ export default function Home() {
                               backgroundColor: duoBuildHeat === h.id ? goldDim : "transparent",
                               cursor: "pointer", fontFamily: "'Inter', sans-serif", fontSize: "12px",
                               fontWeight: duoBuildHeat === h.id ? "700" : "400", color: duoBuildHeat === h.id ? gold : muted,
-                            }}>{h.emoji} {h.label}</button>
+                            }}>{h.label}</button>
                           ))}
                         </div>
                       </div>
@@ -1166,7 +1166,7 @@ export default function Home() {
                     {HEATS.map(h => (
                       <button key={h.id} onClick={() => setNotes(prev => { const base = prev.replace(/Heat:.*?(\n|$)/, "").trim(); return base ? `${base}\nHeat: ${h.label}` : `Heat: ${h.label}`; })}
                         style={{ flex: 1, padding: "12px", borderRadius: "2px", border: notes.includes(`Heat: ${h.label}`) ? `1px solid ${gold}` : `1px solid ${border}`, backgroundColor: notes.includes(`Heat: ${h.label}`) ? goldDim : "transparent", cursor: "pointer", fontFamily: "'Inter', sans-serif", fontSize: "12px", transition: "all 0.2s", color: notes.includes(`Heat: ${h.label}`) ? gold : muted }}>
-                        {h.emoji} {h.label}
+                        {h.label}
                       </button>
                     ))}
                   </div>
