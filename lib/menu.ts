@@ -21,39 +21,39 @@ export const ALLERGY_WARNING =
 
 export type Heat = "mild" | "medium" | "hot";
 export const HEATS: { id: Heat; label: string; emoji: string }[] = [
-  { id: "mild",   label: "Mild",   emoji: "≡ƒÿè" },
-  { id: "medium", label: "Medium", emoji: "≡ƒî╢∩╕Å" },
-  { id: "hot",    label: "Hot",    emoji: "≡ƒöÑ" },
+  { id: "mild",   label: "Mild",   emoji: "😋" },
+  { id: "medium", label: "Medium", emoji: "🌶️" },
+  { id: "hot",    label: "Hot",    emoji: "🔥" },
 ];
 
 // ΓöÇΓöÇ Build Your Own Boil ingredients ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 export const BUILD_BASE = { solo: 60, duo: 100 } as const;
 
 export const SEAFOOD = [
-  { id: "shrimp",  emoji: "≡ƒªÉ", label: "Shrimp",          desc: "6 shrimp",  price: 30 },
-  { id: "crab",    emoji: "≡ƒªÇ", label: "Snow Crab",       desc: "1 portion", price: 50 },
-  { id: "mussels", emoji: "≡ƒÉÜ", label: "Mussels",         desc: "1 portion", price: 10 },
-  { id: "squid",   emoji: "≡ƒÉÖ", label: "Squid & Octopus", desc: "1 portion", price: 20 },
-  { id: "clams",   emoji: "≡ƒÉî", label: "Clams",           desc: "1 portion", price: 10 },
+  { id: "shrimp",  emoji: "🦐", label: "Shrimp",          desc: "6 shrimp",  price: 30 },
+  { id: "crab",    emoji: "🦀", label: "Snow Crab",       desc: "1 portion", price: 50 },
+  { id: "mussels", emoji: "🦪", label: "Mussels",         desc: "1 portion", price: 10 },
+  { id: "squid",   emoji: "🐙", label: "Squid & Octopus", desc: "1 portion", price: 20 },
+  { id: "clams",   emoji: "🐚", label: "Clams",           desc: "1 portion", price: 10 },
 ];
 export const DUO_SEAFOOD = [
-  { id: "shrimp",  emoji: "≡ƒªÉ", label: "Shrimp",          desc: "12 shrimp",  price: 60  },
-  { id: "crab",    emoji: "≡ƒªÇ", label: "Snow Crab",       desc: "2 portions", price: 100 },
-  { id: "mussels", emoji: "≡ƒÉÜ", label: "Mussels",         desc: "2 portions", price: 20  },
-  { id: "squid",   emoji: "≡ƒÉÖ", label: "Squid & Octopus", desc: "2 portions", price: 40  },
-  { id: "clams",   emoji: "≡ƒÉî", label: "Clams",           desc: "2 portions", price: 20  },
+  { id: "shrimp",  emoji: "🦐", label: "Shrimp",          desc: "12 shrimp",  price: 60  },
+  { id: "crab",    emoji: "🦀", label: "Snow Crab",       desc: "2 portions", price: 100 },
+  { id: "mussels", emoji: "🦪", label: "Mussels",         desc: "2 portions", price: 20  },
+  { id: "squid",   emoji: "🐙", label: "Squid & Octopus", desc: "2 portions", price: 40  },
+  { id: "clams",   emoji: "🐚", label: "Clams",           desc: "2 portions", price: 20  },
 ];
 export const EXTRAS = [
-  { id: "eggs",     emoji: "≡ƒÑÜ", label: "Eggs",           desc: "2 pieces",  price: 5  },
-  { id: "sausage",  emoji: "≡ƒî¡", label: "Sausage",        desc: "1 portion", price: 10 },
-  { id: "corn",     emoji: "≡ƒî╜", label: "Extra Corn",     desc: "1 portion", price: 5  },
-  { id: "potatoes", emoji: "≡ƒÑö", label: "Extra Potatoes", desc: "1 portion", price: 5  },
+  { id: "eggs",     emoji: "🥚", label: "Eggs",           desc: "2 pieces",  price: 5  },
+  { id: "sausage",  emoji: "🌭", label: "Sausage",        desc: "1 portion", price: 10 },
+  { id: "corn",     emoji: "🌽", label: "Extra Corn",     desc: "1 portion", price: 5  },
+  { id: "potatoes", emoji: "🥔", label: "Extra Potatoes", desc: "1 portion", price: 5  },
 ];
 export const DUO_EXTRAS = [
-  { id: "eggs",     emoji: "≡ƒÑÜ", label: "Eggs",           desc: "4 pieces",   price: 10 },
-  { id: "sausage",  emoji: "≡ƒî¡", label: "Sausage",        desc: "2 portions", price: 20 },
-  { id: "corn",     emoji: "≡ƒî╜", label: "Extra Corn",     desc: "2 portions", price: 10 },
-  { id: "potatoes", emoji: "≡ƒÑö", label: "Extra Potatoes", desc: "2 portions", price: 10 },
+  { id: "eggs",     emoji: "🥚", label: "Eggs",           desc: "4 pieces",   price: 10 },
+  { id: "sausage",  emoji: "🌭", label: "Sausage",        desc: "2 portions", price: 20 },
+  { id: "corn",     emoji: "🌽", label: "Extra Corn",     desc: "2 portions", price: 10 },
+  { id: "potatoes", emoji: "🥔", label: "Extra Potatoes", desc: "2 portions", price: 10 },
 ];
 
 // ΓöÇΓöÇ Add-ons for Solo, Duo and Lobster boils ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
@@ -83,15 +83,15 @@ export const DUO_OPTIONS = [
 export const SIMPLE_ITEMS = [
   { id: "ramen", name: "Shrimp Alfredo Ramen Boil", desc: "Shrimp, ramen noodles, homemade Alfredo sauce, sausage, boiled egg & corn", price: 100, image: "/ramen2.jpeg" as string | null, tag: "Fan Favourite" as string | null },
   { id: "wings", name: "Wings Boil", desc: "6-8 wings tossed in our signature specialty butter sauce", price: 80, image: "/wings2.jpeg" as string | null, tag: null as string | null },
-  { id: "sauce", name: "Pepper Sauce", desc: "Homemade Lime Pepper Sauce ΓÇö optional add-on", price: 10, image: null as string | null, tag: null as string | null },
-  { id: "combo", name: "Club Ramen Wings Combo", desc: "Shrimp Alfredo Ramen Boil + Wings Boil ΓÇö the ultimate combo", price: 120, image: "/wings2.jpeg" as string | null, tag: "New" as string | null },
+  { id: "sauce", name: "Pepper Sauce", desc: "Homemade Lime Pepper Sauce - optional add-on", price: 10, image: null as string | null, tag: null as string | null },
+  { id: "combo", name: "Club Ramen Wings Combo", desc: "Shrimp Alfredo Ramen Boil + Wings Boil - the ultimate combo", price: 120, image: "/wings2.jpeg" as string | null, tag: "New" as string | null },
 ];
 export const LOBSTER_PRODUCTS = [
-  { id: "lobster_half",         name: "Half Lobster Boil",           desc: "┬╜ lobster, sausage, boiled egg, clams, mussels, octopi, squid, corn, potatoes & House Butter Sauce",                    soloPrice: 260, duoPrice: 360, soloPortions: "┬╜ lobster",                         duoPortions: "┬╜ lobster (larger serving)" },
+  { id: "lobster_half",         name: "Half Lobster Boil",           desc: "½ lobster, sausage, boiled egg, clams, mussels, octopi, squid, corn, potatoes & House Butter Sauce",                    soloPrice: 260, duoPrice: 360, soloPortions: "½ lobster",                         duoPortions: "½ lobster (larger serving)" },
   { id: "lobster_whole",        name: "Whole Lobster Boil",          desc: "1 whole lobster, sausage, boiled egg, clams, mussels, octopi, squid, corn, potatoes & House Butter Sauce",              soloPrice: 360, duoPrice: 550, soloPortions: "1 whole lobster",                   duoPortions: "1 whole lobster (larger serving)" },
-  { id: "lobster_shrimp_half",  name: "Shrimp & Half Lobster Boil",  desc: "┬╜ lobster, shrimp, sausage, boiled egg, clams, mussels, octopi, squid, corn, potatoes & House Butter Sauce",            soloPrice: 290, duoPrice: 460, soloPortions: "┬╜ lobster + 6 shrimp",              duoPortions: "┬╜ lobster + 12 shrimp" },
+  { id: "lobster_shrimp_half",  name: "Shrimp & Half Lobster Boil",  desc: "½ lobster, shrimp, sausage, boiled egg, clams, mussels, octopi, squid, corn, potatoes & House Butter Sauce",            soloPrice: 290, duoPrice: 460, soloPortions: "½ lobster + 6 shrimp",              duoPortions: "½ lobster + 12 shrimp" },
   { id: "lobster_shrimp_whole", name: "Shrimp & Whole Lobster Boil", desc: "1 whole lobster, shrimp, sausage, boiled egg, clams, mussels, octopi, squid, corn, potatoes & House Butter Sauce",      soloPrice: 390, duoPrice: 610, soloPortions: "1 whole lobster + 6 shrimp",        duoPortions: "1 whole lobster + 12 shrimp" },
-  { id: "lobster_loaded_half",  name: "Loaded Half Lobster Boil",    desc: "┬╜ lobster, shrimp, snow crab, sausage, boiled egg, clams, mussels, octopi, squid, corn, potatoes & House Butter Sauce", soloPrice: 340, duoPrice: 560, soloPortions: "┬╜ lobster + shrimp + snow crab",    duoPortions: "┬╜ lobster + shrimp + snow crab (larger serving)" },
+  { id: "lobster_loaded_half",  name: "Loaded Half Lobster Boil",    desc: "½ lobster, shrimp, snow crab, sausage, boiled egg, clams, mussels, octopi, squid, corn, potatoes & House Butter Sauce", soloPrice: 340, duoPrice: 560, soloPortions: "½ lobster + shrimp + snow crab",    duoPortions: "½ lobster + shrimp + snow crab (larger serving)" },
   { id: "lobster_loaded_whole", name: "Loaded Whole Lobster Boil",   desc: "1 whole lobster, shrimp, snow crab, sausage, boiled egg, clams, mussels, octopi, squid, corn, potatoes & House Butter Sauce", soloPrice: 440, duoPrice: 710, soloPortions: "1 whole lobster + shrimp + snow crab", duoPortions: "1 whole lobster + shrimp + snow crab (larger serving)" },
 ];
 
@@ -133,9 +133,9 @@ export const CATALOG: CatalogItem[] = [
     { id: `${p.id}_duo`, group: "lobster" as const, name: `${p.name} (Duo)`, description: p.duoPortions, basePrice: p.duoPrice,
       settingKey: `menu_${p.id}`, favKey: `fav_${p.id}`, allowsAddons: true, kind: "fixed" as const, size: "duo" as const },
   ])),
-  { id: "build_solo", group: "build", name: "Build Your Own Boil",       description: "Solo ΓÇö choose seafood, extras & heat", basePrice: BUILD_BASE.solo,
+  { id: "build_solo", group: "build", name: "Build Your Own Boil",       description: "Solo - choose seafood, extras & heat", basePrice: BUILD_BASE.solo,
     settingKey: "menu_build", favKey: "fav_build", allowsAddons: false, kind: "build", size: "solo" },
-  { id: "build_duo",  group: "build", name: "Build Your Own Boil (Duo)", description: "Duo ΓÇö choose seafood, extras & heat",  basePrice: BUILD_BASE.duo,
+  { id: "build_duo",  group: "build", name: "Build Your Own Boil (Duo)", description: "Duo - choose seafood, extras & heat",  basePrice: BUILD_BASE.duo,
     settingKey: "menu_build", favKey: "fav_build", allowsAddons: false, kind: "build", size: "duo" },
   ...SIMPLE_ITEMS.map(i => ({
     id: i.id, group: "more" as const, name: i.name, description: i.desc, basePrice: i.price,
@@ -184,7 +184,7 @@ export interface PricedLine {
   size: "solo" | "duo" | null;
   quantity: number;
   basePrice: number;
-  addons: { id: string; label: string; qty: number; unitPrice: number }[];
+  addons: { id: string; label: string; description: string; qty: number; unitPrice: number }[];
   seafood: { id: string; label: string; price: number }[];
   extras: { id: string; label: string; price: number }[];
   heat: Heat | null;
@@ -230,7 +230,7 @@ export function priceCart(input: unknown, isAvailable: (item: CatalogItem) => bo
         if (!addon) return { ok: false, error: "An extra in your cart is no longer available.", itemId };
         if (!item.allowsAddons) return { ok: false, error: `${item.name} cannot be customised.`, itemId };
         if (!isInt(qty) || qty < 0 || qty > MAX_ADDON_QTY) return { ok: false, error: "Invalid extra quantity.", itemId };
-        addons.push({ id, label: addon.label, qty, unitPrice: addon.unitPrice });
+        addons.push({ id, label: addon.label, description: addon.desc, qty, unitPrice: addon.unitPrice });
       }
       addons.sort((a, b) => ADDON_EXTRAS.findIndex(x => x.id === a.id) - ADDON_EXTRAS.findIndex(x => x.id === b.id));
     }
@@ -293,7 +293,7 @@ export function describeLine(
     const base = `${seafood.map(s => s.label).join(", ")}${extras.length ? ` + ${extras.map(e => e.label).join(", ")}` : ""} - ${heatLabel}`;
     return item.size === "duo" ? `${base} (Duo)` : base;
   }
-  return item.description + (addons.length ? " + " + addons.map(a => `${a.qty}x ${a.label}`).join(", ") : "");
+  return item.description + (addons.length ? " + " + addons.map(a => `${a.qty}x ${a.label} (${a.description})`).join(", ") : "");
 }
 
 /** Lines in the legacy text format still used by the Admin order list. */
