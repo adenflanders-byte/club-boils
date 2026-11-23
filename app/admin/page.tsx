@@ -98,6 +98,7 @@ export default function AdminPage() {
   const [openDays,       setOpenDays]       = useState({ thursday: true, friday: true, saturday: false });
   const [settingsLoading,setSettingsLoading]= useState(false);
   const [settingsSaved,  setSettingsSaved]  = useState(false);
+  const [settingsError,  setSettingsError]  = useState("");
 
   // Reviews
   const [pendingReviews, setPendingReviews] = useState<{id: string, name: string, rating: number, comment: string, created_at: string}[]>([]);
@@ -179,6 +180,8 @@ export default function AdminPage() {
 
   async function saveSettings() {
     setSettingsLoading(true);
+    setSettingsSaved(false);
+    setSettingsError("");
     const updates = [
       { key: "orders_open",   value: String(ordersOpen) },
       { key: "delivery_enabled", value: String(deliveryEnabled) },
@@ -188,8 +191,13 @@ export default function AdminPage() {
       { key: "day_friday",    value: String(openDays.friday)   },
       { key: "day_saturday",  value: String(openDays.saturday) },
     ];
-    await supabase.from("settings").upsert(updates);
-    setSettingsLoading(false); setSettingsSaved(true);
+    const { error } = await supabase.from("settings").upsert(updates);
+    setSettingsLoading(false);
+    if (error) {
+      setSettingsError(error.message || "Settings could not be saved. Please try again.");
+      return;
+    }
+    setSettingsSaved(true);
     setTimeout(() => setSettingsSaved(false), 3000);
   }
 
@@ -633,6 +641,7 @@ export default function AdminPage() {
               style={{ background: `linear-gradient(135deg, ${C.gold}, #E8B84B)`, color: C.black, padding: "12px 28px", borderRadius: "4px", border: "none", fontFamily: FONT_BODY, fontWeight: "700", fontSize: "12px", letterSpacing: "0.1em", cursor: "pointer", textTransform: "uppercase" as const }}>
               {settingsLoading ? "Saving..." : settingsSaved ? "✅ Saved!" : "Save Settings"}
             </button>
+            {settingsError && <p style={{ color: "#A03030", fontSize: "12px", marginTop: "10px" }}>{settingsError}</p>}
           </div>
 
           {/* Pending Reviews */}
