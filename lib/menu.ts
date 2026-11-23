@@ -58,15 +58,15 @@ export const DUO_EXTRAS = [
 
 // ΓöÇΓöÇ Add-ons for Solo, Duo and Lobster boils ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 export const ADDON_EXTRAS = [
-  { id: "extra_shrimp",  emoji: "🦐", label: "Extra Shrimp",    desc: "one portion",              unitPrice: 30 },
+  { id: "extra_shrimp",  emoji: "🦐", label: "Extra Shrimp",    desc: "one portion (6 pieces)",              unitPrice: 30 },
   { id: "extra_crab",    emoji: "🦀", label: "Extra Snow Crab", desc: "one portion",              unitPrice: 50 },
-  { id: "extra_egg",     emoji: "🥚", label: "Extra Egg",       desc: "one portion",              unitPrice: 5  },
+  { id: "extra_egg",     emoji: "🥚", label: "Extra Egg",       desc: "one egg",              unitPrice: 5  },
   { id: "extra_clams",   emoji: "🐚", label: "Extra Clams",     desc: "one portion (3-5 pieces)", unitPrice: 25 },
   { id: "extra_mussels", emoji: "🦪", label: "Extra Mussels",   desc: "one portion (3-5 pieces)", unitPrice: 25 },
   { id: "extra_sausage", emoji: "🌭", label: "Extra Sausage",   desc: "one portion",              unitPrice: 15 },
   { id: "extra_corn",    emoji: "🌽", label: "Extra Corn",      desc: "one portion (3-5 pieces)", unitPrice: 20 },
-  { id: "extra_potato",  emoji: "🥔", label: "Extra Potatoes",  desc: "one extra portion",        unitPrice: 20 },
-  { id: "pepper_sauce",  emoji: "🌶️", label: "Pepper Sauce",   desc: "one portion",              unitPrice: 10 },
+  { id: "extra_potato",  emoji: "🥔", label: "Extra Potatoes",  desc: "one portion",        unitPrice: 20 },
+  { id: "pepper_sauce",  emoji: "🌶️", label: "Pepper Sauce",   desc: "one serving",              unitPrice: 10 },
 ];
 export const MAX_ADDON_QTY = 10;
 // ΓöÇΓöÇ Fixed products ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
