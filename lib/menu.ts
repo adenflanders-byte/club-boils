@@ -67,7 +67,7 @@ export const ADDON_EXTRAS = [
   { id: "extra_corn",    emoji: "🌽", label: "Extra Corn",      desc: "one portion (3-5 pieces)", unitPrice: 20 },
   { id: "extra_potato",  emoji: "🥔", label: "Extra Potatoes",  desc: "one extra portion",        unitPrice: 20 },
   { id: "pepper_sauce",  emoji: "🌶️", label: "Pepper Sauce",   desc: "one portion",              unitPrice: 10 },
-export const MAX_ADDON_QTY = 10;
+];
 
 // ΓöÇΓöÇ Fixed products ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 export const SOLO_OPTIONS = [
