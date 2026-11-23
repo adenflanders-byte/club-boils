@@ -68,7 +68,7 @@ export const ADDON_EXTRAS = [
   { id: "extra_potato",  emoji: "🥔", label: "Extra Potatoes",  desc: "one extra portion",        unitPrice: 20 },
   { id: "pepper_sauce",  emoji: "🌶️", label: "Pepper Sauce",   desc: "one portion",              unitPrice: 10 },
 ];
-
+export const MAX_ADDON_QTY = 10;
 // ΓöÇΓöÇ Fixed products ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 export const SOLO_OPTIONS = [
   { id: "solo-shrimp", label: "Shrimp",             price: 130 },
