@@ -1095,7 +1095,7 @@ export default function Home() {
                             <span style={{ fontSize: "20px" }}>{extra.emoji}</span>
                             <div>
                               <p style={{ fontSize: "13px", fontWeight: "500", color: charcoal }}>{extra.label}</p>
-                              <p style={{ fontSize: "11px", color: muted }}>{extra.desc} · TT${extra.unitPrice}</p>
+                              <p style={{ fontSize: "11px", color: muted }}>{extra.desc} - TT${extra.unitPrice}</p>
                             </div>
                           </div>
                           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
