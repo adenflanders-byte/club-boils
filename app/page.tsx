@@ -111,6 +111,7 @@ export default function Home() {
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const [reviewSubmitted,  setReviewSubmitted]  = useState(false);
   const [ordersOpen, setOrdersOpen] = useState(true);
+  const [deliveryEnabled, setDeliveryEnabled] = useState(true);
   const [lobsterVariant, setLobsterVariant] = useState<Record<string, "solo"|"duo"|"">>({
     lobster_half: "", lobster_whole: "", lobster_shrimp_half: "",
     lobster_shrimp_whole: "", lobster_loaded_half: "", lobster_loaded_whole: "",
@@ -138,6 +139,8 @@ export default function Home() {
       if (data) {
         const ordersOpenRow = data.find(r => r.key === "orders_open");
         if (ordersOpenRow) setOrdersOpen(ordersOpenRow.value === "true");
+        const deliveryRow = data.find(r => r.key === "delivery_enabled");
+        if (deliveryRow) setDeliveryEnabled(deliveryRow.value !== "false");
         const menuState: Record<string, boolean> = {};
         data.filter(r => r.key.startsWith("menu_")).forEach(r => { menuState[r.key] = r.value === "true"; });
         if (Object.keys(menuState).length > 0) setMenuItems(prev => ({ ...prev, ...menuState }));
@@ -1092,7 +1095,7 @@ export default function Home() {
                             <span style={{ fontSize: "20px" }}>{extra.emoji}</span>
                             <div>
                               <p style={{ fontSize: "13px", fontWeight: "500", color: charcoal }}>{extra.label}</p>
-                              <p style={{ fontSize: "11px", color: muted }}>TT${extra.unitPrice} each</p>
+                              <p style={{ fontSize: "11px", color: muted }}>{extra.desc} · TT${extra.unitPrice}</p>
                             </div>
                           </div>
                           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
@@ -1435,7 +1438,7 @@ export default function Home() {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "1px", backgroundColor: border }}>
               {[
                 { icon: "📍", label: "Location", value: "Arima, Trinidad", sub: "Exact address shared upon confirmation" },
-                { icon: "🕛", label: "Hours",    value: "Thu, Fri & Sat", sub: "12:00 PM – 6:00 PM" },
+                { icon: "🕛", label: "Hours",    value: "Thu, Fri & Sat", sub: "11:30 AM – 6:00 PM" },
                 { icon: "📞", label: "Phone",    value: "868-293-0570", sub: "Call or WhatsApp", href: "tel:8682930570" },
                 { icon: "📸", label: "Instagram", value: "@theclub.boils", sub: "Follow for updates", href: "https://instagram.com/theclub.boils" },
               ].map(item => (
