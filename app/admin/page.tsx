@@ -80,6 +80,7 @@ export default function AdminPage() {
 
   // Settings
   const [ordersOpen,     setOrdersOpen]     = useState(true);
+  const [deliveryEnabled,setDeliveryEnabled] = useState(true);
   const [menuItems,      setMenuItems]      = useState<Record<string, boolean>>({
     menu_solo_shrimp: true, menu_solo_crab: true, menu_solo_mix: true,
     menu_duo_shrimp: true,  menu_duo_crab: true,  menu_duo_mix: true,
@@ -157,6 +158,8 @@ export default function AdminPage() {
     if (data) {
       const ordersOpenRow = data.find(r => r.key === "orders_open");
       if (ordersOpenRow) setOrdersOpen(ordersOpenRow.value === "true");
+      const deliveryRow = data.find(r => r.key === "delivery_enabled");
+      if (deliveryRow) setDeliveryEnabled(deliveryRow.value !== "false");
       const menuState: Record<string, boolean> = {};
       data.filter(r => r.key.startsWith("menu_")).forEach(r => { menuState[r.key] = r.value === "true"; });
       if (Object.keys(menuState).length > 0) setMenuItems(prev => ({ ...prev, ...menuState }));
@@ -178,6 +181,7 @@ export default function AdminPage() {
     setSettingsLoading(true);
     const updates = [
       { key: "orders_open",   value: String(ordersOpen) },
+      { key: "delivery_enabled", value: String(deliveryEnabled) },
       ...Object.entries(menuItems).map(([key, value]) => ({ key, value: String(value) })),
       ...Object.entries(favItems).map(([key, value]) => ({ key, value: String(value) })),
       { key: "day_thursday",  value: String(openDays.thursday) },
@@ -536,6 +540,17 @@ export default function AdminPage() {
               </div>
               <div style={{ width: "48px", height: "24px", borderRadius: "12px", backgroundColor: ordersOpen ? "#1A7A3A" : "#A03030", position: "relative" as const, transition: "background 0.3s" }}>
                 <div style={{ width: "20px", height: "20px", borderRadius: "50%", backgroundColor: C.white, position: "absolute", top: "2px", left: ordersOpen ? "26px" : "2px", transition: "left 0.3s" }} />
+              </div>
+            </div>
+
+            {/* Delivery Toggle */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 20px", backgroundColor: deliveryEnabled ? "#EAFFF0" : "#FFF5E6", borderRadius: "6px", border: `1px solid ${deliveryEnabled ? "#8FD4A0" : "#F5C6A0"}`, marginBottom: "20px", cursor: "pointer" }} onClick={() => setDeliveryEnabled(!deliveryEnabled)}>
+              <div>
+                <p style={{ fontWeight: "700", fontSize: "16px", color: deliveryEnabled ? "#1A7A3A" : "#8B4000" }}>{deliveryEnabled ? "Delivery is AVAILABLE" : "PICKUP ONLY - Delivery unavailable"}</p>
+                <p style={{ fontSize: "12px", color: deliveryEnabled ? "#1A7A3A" : "#8B4000", marginTop: "2px" }}>Click to toggle</p>
+              </div>
+              <div style={{ width: "48px", height: "24px", borderRadius: "12px", backgroundColor: deliveryEnabled ? "#1A7A3A" : "#C06000", position: "relative", transition: "background 0.3s" }}>
+                <div style={{ width: "20px", height: "20px", borderRadius: "50%", backgroundColor: "white", position: "absolute", top: "2px", left: deliveryEnabled ? "26px" : "2px", transition: "left 0.3s" }} />
               </div>
             </div>
 
