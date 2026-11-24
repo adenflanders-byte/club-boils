@@ -116,6 +116,9 @@ export async function placeRegularOrder(body: Record<string, unknown>): Promise<
 
   const fulfilment = body.fulfillment === "delivery" ? "delivery" : body.fulfillment === "pickup" ? "pickup" : null;
   if (!fulfilment) throw new HttpError(400, "Please choose delivery or pickup.");
+  if (fulfilment === "delivery" && settings.delivery_enabled === "false") {
+    throw new HttpError(409, "Delivery is unavailable this weekend. Please select pickup.", "DELIVERY_CLOSED");
+  }
   let address: string | null = null;
   let area: string | null = null;
   if (fulfilment === "delivery") {

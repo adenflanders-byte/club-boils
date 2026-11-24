@@ -13,6 +13,7 @@ type Heat = "mild" | "medium" | "hot" | "";
 interface ExtraItem {
   id: string;
   label: string;
+  desc: string;
   qty: number;
   unitPrice: number;
 }
@@ -65,9 +66,9 @@ export default function Home() {
     if (!customizerItem) return;
     const activeExtras: ExtraItem[] = ADDON_EXTRAS
       .filter(e => (customizerExtras[e.id] || 0) > 0)
-      .map(e => ({ id: e.id, label: e.label, qty: customizerExtras[e.id], unitPrice: e.unitPrice }));
+      .map(e => ({ id: e.id, label: e.label, desc: e.desc, qty: customizerExtras[e.id], unitPrice: e.unitPrice }));
     const extrasDesc = activeExtras.length > 0
-      ? " + " + activeExtras.map(e => `${e.qty}x ${e.label}`).join(", ")
+      ? " + " + activeExtras.map(e => `${e.qty}x ${e.label} (${e.desc})`).join(", ")
       : "";
     // "solo-shrimp" → "solo_shrimp", "lobster_half-duo" → "lobster_half_duo"
     const itemId = customizerItem.id.replace(/^(solo|duo)-/, "$1_").replace(/-(solo|duo)$/, "_$1");
@@ -140,7 +141,16 @@ export default function Home() {
         const ordersOpenRow = data.find(r => r.key === "orders_open");
         if (ordersOpenRow) setOrdersOpen(ordersOpenRow.value === "true");
         const deliveryRow = data.find(r => r.key === "delivery_enabled");
-        if (deliveryRow) setDeliveryEnabled(deliveryRow.value !== "false");
+        if (deliveryRow) {
+          const enabled = deliveryRow.value !== "false";
+          setDeliveryEnabled(enabled);
+          if (!enabled) {
+            setFulfillment("pickup");
+            setAddress("");
+            setDeliveryArea("");
+            setDeliveryAcknowledged(false);
+          }
+        }
         const menuState: Record<string, boolean> = {};
         data.filter(r => r.key.startsWith("menu_")).forEach(r => { menuState[r.key] = r.value === "true"; });
         if (Object.keys(menuState).length > 0) setMenuItems(prev => ({ ...prev, ...menuState }));
@@ -344,6 +354,7 @@ export default function Home() {
   async function handleSubmit() {
     if (!name.trim() || !phone.trim())                               { alert("Please fill in your name and phone number."); return; }
     if (!fulfillment)                                                { alert("Please choose delivery or pickup."); return; }
+    if (!deliveryEnabled && fulfillment === "delivery")             { alert("Delivery is unavailable this weekend. Please select pickup."); return; }
     if (fulfillment === "delivery" && !address.trim())               { alert("Please enter your delivery address."); return; }
     if (fulfillment === "delivery" && !deliveryAcknowledged)         { alert("Please acknowledge the delivery window before placing your order."); return; }
     if (cart.length === 0)                                           { alert("Your cart is empty!"); return; }
@@ -376,7 +387,7 @@ export default function Home() {
 
   const cartTotal  = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const cartCount  = cart.reduce((sum, item) => sum + item.quantity, 0);
-  const totalPrice = fulfillment === "delivery" ? cartTotal + DELIVERY_FEE : cartTotal;
+  const totalPrice = deliveryEnabled && fulfillment === "delivery" ? cartTotal + DELIVERY_FEE : cartTotal;
   const activeSoloOptions = SOLO_OPTIONS.filter(o => menuItems[`menu_solo_${o.id.split("-")[1]}`]);
   const activeDuoOptions  = DUO_OPTIONS.filter(o  => menuItems[`menu_duo_${o.id.split("-")[1]}`]);
   const activeSimpleItems = SIMPLE_ITEMS.filter(i => menuItems[`menu_${i.id}`]);
@@ -577,7 +588,9 @@ export default function Home() {
                     <span style={{ fontSize: "12px", color: muted, letterSpacing: "0.06em", textTransform: "uppercase" as const }}>Subtotal</span>
                     <span style={{ fontSize: "14px", fontWeight: "700" }}>TT${cartTotal}</span>
                   </div>
-                  <p style={{ fontSize: "11px", color: muted, marginBottom: "16px" }}>Delivery fee (TT$30) added at checkout if applicable</p>
+                  <p style={{ fontSize: "11px", color: muted, marginBottom: "16px" }}>
+                    {deliveryEnabled ? "Delivery fee (TT$30) added at checkout if applicable" : "Pickup only in Arima this weekend"}
+                  </p>
                   <button onClick={() => { setShowCart(false); setShowForm(true); setTimeout(() => document.getElementById("checkout")?.scrollIntoView({ behavior: "smooth" }), 100); }} style={{ ...goldBtn, width: "100%", padding: "16px" }} className="gold-btn">
                     Checkout — TT${cartTotal}
                   </button>
@@ -593,6 +606,13 @@ export default function Home() {
 
         {/* HERO */}
         <section style={{ position: "relative", height: "100vh", minHeight: "600px", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          {!deliveryEnabled && (
+            <div style={{ position: "absolute", top: "88px", left: "50%", transform: "translateX(-50%)", zIndex: 3, width: "min(92%, 680px)", padding: "12px 18px", borderRadius: "4px", backgroundColor: "rgba(250,248,243,0.96)", border: `1px solid ${gold}`, textAlign: "center" }}>
+              <p style={{ color: "#8B4000", fontSize: "13px", lineHeight: 1.6 }}>
+                <strong>Pickup Only</strong> - Delivery is unavailable this weekend. All orders must be collected in Arima.
+              </p>
+            </div>
+          )}
           {/* Ken Burns image */}
           <img
             src="/spread.jpeg"
@@ -617,7 +637,9 @@ export default function Home() {
               SEAFOOD
             </h1>
             <p style={{ fontSize: "clamp(13px, 2vw, 16px)", color: "rgba(255,255,255,0.65)", maxWidth: "440px", margin: "0 auto 48px", lineHeight: 1.9, fontWeight: "300", letterSpacing: "0.02em" }}>
-              Open Thursday, Friday &amp; Saturday. Order online for pickup or delivery.
+              {deliveryEnabled
+                ? "Open Thursday, Friday & Saturday. Order online for pickup or delivery."
+                : "Open Thursday, Friday & Saturday. Pickup orders only this weekend."}
             </p>
             <button onClick={revealMenu} style={goldBtn} className="gold-btn">
               Browse the Menu
@@ -1171,11 +1193,18 @@ export default function Home() {
                     ))}
                   </div>
                 </div>
+                {!deliveryEnabled && (
+                  <div style={{ backgroundColor: "#FFF8EC", border: "1px solid #F0C04A", borderRadius: "4px", padding: "14px 16px" }}>
+                    <p style={{ fontSize: "12px", color: "#8B4000", lineHeight: 1.7 }}>
+                      <strong>Pickup Only</strong> - Delivery is unavailable this weekend. All orders must be collected in Arima between 11:30 AM and 6:00 PM.
+                    </p>
+                  </div>
+                )}
                 <div>
-                  <label style={labelStyle}>Delivery or Pickup? *</label>
+                  <label style={labelStyle}>{deliveryEnabled ? "Delivery or Pickup? *" : "Collection Method"}</label>
                   <div style={{ display: "flex", gap: "10px" }}>
                     <button onClick={() => { setFulfillment("pickup"); setDeliveryAcknowledged(false); }}   style={fulfillBtn("pickup")}>🏠 Pickup</button>
-                    <button onClick={() => setFulfillment("delivery")} style={fulfillBtn("delivery")}>🚗 Delivery (+TT$30)</button>
+                    {deliveryEnabled && <button onClick={() => setFulfillment("delivery")} style={fulfillBtn("delivery")}>🚗 Delivery (+TT$30)</button>}
                   </div>
                 </div>
                 {fulfillment === "pickup" && (
@@ -1183,7 +1212,7 @@ export default function Home() {
                     <p style={{ fontSize: "12px", color: "#1A7A3A", lineHeight: 1.6 }}>🏠 <strong>Pickup begins at 11:30 AM</strong> in Arima. Please arrive during our operating window (11:30 AM – 6:00 PM).</p>
                   </div>
                 )}
-                {fulfillment === "delivery" && (
+                {deliveryEnabled && fulfillment === "delivery" && (
                 <div>
                   {/* Delivery window notice */}
                   <div style={{ backgroundColor: "#EBF3FF", border: "1px solid #B8D4F5", borderRadius: "4px", padding: "14px 16px", marginBottom: "12px" }}>
@@ -1207,17 +1236,17 @@ export default function Home() {
                   </select>
                   {deliveryArea === "Other East area — request confirmation" && (
                     <div style={{ backgroundColor: "#EBF3FF", border: "1px solid #B8D4F5", borderRadius: "4px", padding: "10px 14px", marginTop: "8px" }}>
-                      <p style={{ fontSize: "12px", color: "#1A56A4" }}>📞 Your order will be placed but delivery needs confirmation. We'll contact you at the number provided.</p>
+                      <p style={{ fontSize: "12px", color: "#1A56A4" }}>📞 Your order will be placed but delivery needs confirmation. We&apos;ll contact you at the number provided.</p>
                     </div>
                   )}
                 </div>
               )}
-              {fulfillment === "delivery" && (
+              {deliveryEnabled && fulfillment === "delivery" && (
                   <div style={{ backgroundColor: "rgba(196,149,42,0.08)", border: `1px solid ${border}`, borderRadius: "2px", padding: "14px 16px", fontSize: "13px", color: muted, lineHeight: 1.6 }}>
-                    ⚠️ Delivery is available to select areas in East Trinidad for TT$30. We'll confirm availability for your address after your order is placed.
+                    ⚠️ Delivery is available to select areas in East Trinidad for TT$30. We&apos;ll confirm availability for your address after your order is placed.
                   </div>
                 )}
-                {fulfillment === "delivery" && (
+                {deliveryEnabled && fulfillment === "delivery" && (
                   <div>
                     <label style={labelStyle}>Delivery Address *</label>
                     <input type="text" value={address} onChange={e => setAddress(e.target.value)} placeholder="Street, City, Region" style={inputStyle} />
@@ -1235,7 +1264,7 @@ export default function Home() {
                       <span style={{ fontWeight: "700", color: black, marginLeft: "12px", whiteSpace: "nowrap" as const }}>TT${item.price * item.quantity}</span>
                     </div>
                   ))}
-                  {fulfillment && <p style={{ marginTop: "10px", fontSize: "12px", color: muted }}>{fulfillment === "delivery" ? `🚗 Delivery — +TT$${DELIVERY_FEE}` : "🏠 Pickup"}</p>}
+                  {fulfillment && <p style={{ marginTop: "10px", fontSize: "12px", color: muted }}>{deliveryEnabled && fulfillment === "delivery" ? `🚗 Delivery — +TT$${DELIVERY_FEE}` : "🏠 Pickup"}</p>}
                   <div style={{ borderTop: `1px solid ${border}`, marginTop: "12px", paddingTop: "12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <p style={{ fontFamily: "'Cinzel', serif", fontSize: "20px", color: black }}>Total</p>
                     <p style={{ fontFamily: "'Cinzel', serif", fontSize: "24px", color: gold }}>TT${totalPrice}</p>
@@ -1281,7 +1310,7 @@ export default function Home() {
                   <label style={labelStyle}>Payment Method *</label>
                   <div style={{ display: "flex", gap: "10px" }}>
                     <button onClick={() => setPaymentMethod("cash")} style={{ flex: 1, padding: "14px", borderRadius: "2px", border: paymentMethod === "cash" ? `1px solid ${gold}` : `1px solid ${border}`, backgroundColor: paymentMethod === "cash" ? goldDim : "transparent", cursor: "pointer", fontFamily: "'Inter', sans-serif", fontSize: "13px", fontWeight: paymentMethod === "cash" ? "700" : "400", color: paymentMethod === "cash" ? gold : muted, transition: "all 0.2s" }}>
-                      💵 Cash on Delivery
+                      💵 {deliveryEnabled && fulfillment === "delivery" ? "Cash on Delivery" : "Cash on Pickup"}
                     </button>
                     <button onClick={() => setPaymentMethod("bank")} style={{ flex: 1, padding: "14px", borderRadius: "2px", border: paymentMethod === "bank" ? `1px solid ${gold}` : `1px solid ${border}`, backgroundColor: paymentMethod === "bank" ? goldDim : "transparent", cursor: "pointer", fontFamily: "'Inter', sans-serif", fontSize: "13px", fontWeight: paymentMethod === "bank" ? "700" : "400", color: paymentMethod === "bank" ? gold : muted, transition: "all 0.2s" }}>
                       🏦 Bank Transfer
@@ -1308,11 +1337,13 @@ export default function Home() {
 
                 {paymentMethod === "cash" && (
                   <div style={{ backgroundColor: "rgba(196,149,42,0.08)", border: `1px solid ${border}`, borderRadius: "4px", padding: "14px 16px", fontSize: "12px", color: muted, lineHeight: 1.7 }}>
-                    Payment will be collected upon delivery or pickup. Please have the exact amount ready. A TT$30 delivery fee applies to all deliveries.
+                    {deliveryEnabled && fulfillment === "delivery"
+                      ? "Payment will be collected upon delivery. Please have the exact amount ready. The TT$30 delivery fee is included in your total."
+                      : "Payment will be collected when you pick up your order. Please have the exact amount ready."}
                   </div>
                 )}
 
-                {fulfillment === "delivery" && (
+                {deliveryEnabled && fulfillment === "delivery" && (
                   <label style={{ display: "flex", alignItems: "flex-start", gap: "10px", padding: "14px 16px", backgroundColor: "#EBF3FF", border: "1px solid #B8D4F5", borderRadius: "4px", cursor: "pointer", marginBottom: "12px" }}>
                     <input type="checkbox" checked={deliveryAcknowledged} onChange={e => setDeliveryAcknowledged(e.target.checked)} style={{ marginTop: "3px", accentColor: "#1A56A4", flexShrink: 0, width: "15px", height: "15px" }} />
                     <span style={{ fontSize: "12px", color: "#1A56A4", lineHeight: 1.6 }}>I understand that delivery may arrive at any time between <strong>11:30 AM and 6:00 PM</strong> and is not guaranteed for lunchtime.</span>
@@ -1458,9 +1489,11 @@ export default function Home() {
               ))}
             </div>
             <div style={{ marginTop: "1px", backgroundColor: charcoal, padding: "24px 32px", display: "flex", gap: "16px", alignItems: "flex-start" }}>
-              <span style={{ fontSize: "20px", flexShrink: 0 }}>🚗</span>
+              <span style={{ fontSize: "20px", flexShrink: 0 }}>{deliveryEnabled ? "🚗" : "🏠"}</span>
               <p style={{ fontSize: "13px", color: muted, lineHeight: 1.7 }}>
-                <strong style={{ color: gold }}>Delivery available</strong> to select areas in the East. A TT$30 fee applies. Contact us to confirm your area before placing your order.
+                {deliveryEnabled
+                  ? <><strong style={{ color: gold }}>Delivery available</strong> to select areas in the East. A TT$30 fee applies. Contact us to confirm your area before placing your order.</>
+                  : <><strong style={{ color: gold }}>Pickup only this weekend.</strong> All orders must be collected in Arima between 11:30 AM and 6:00 PM.</>}
               </p>
             </div>
           </div>

@@ -27,8 +27,8 @@ test("prices come from the menu, never from the request", () => {
 test("add-ons are priced per unit and only allowed on boils", () => {
   const r = priceCart([{ itemId: "lobster_half_duo", quantity: 1, addons: { extra_shrimp: 2, pepper_sauce: 1 } }], all);
   assert.ok(r.ok);
-  assert.equal(r.subtotal, 360 + 2 * 25 + 10);
-  assert.equal(r.lines[0].description, "½ lobster (larger serving) + 2x Extra Shrimp, 1x Pepper Sauce");
+  assert.equal(r.subtotal, 360 + 2 * 30 + 10);
+  assert.equal(r.lines[0].description, "½ lobster (larger serving) + 2x Extra Shrimp (one portion (6 pieces)), 1x Pepper Sauce (one serving)");
   const bad = priceCart([{ itemId: "wings", quantity: 1, addons: { extra_shrimp: 1 } }], all);
   assert.equal(bad.ok, false);
 });

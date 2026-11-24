@@ -469,7 +469,7 @@ export default function EventOrdering({ slug }: { slug: string }) {
               const q = customizing.addons[a.id] || 0;
               return (
                 <div key={a.id} className="ev-cart-line">
-                  <div className="ev-cart-text"><strong>{a.emoji} {a.label}</strong><small>+TT${a.unitPrice} each</small></div>
+                  <div className="ev-cart-text"><strong>{a.emoji} {a.label}</strong><small>{a.desc} - TT${a.unitPrice}</small></div>
                   <div className="ev-qty">
                     <button aria-label={`Less ${a.label}`} onClick={() => setCustomizing(c => c && ({ ...c, addons: { ...c.addons, [a.id]: Math.max(0, q - 1) } }))}>−</button>
                     <span>{q}</span>
