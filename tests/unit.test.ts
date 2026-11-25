@@ -6,8 +6,31 @@ import { regularFulfilmentFor, ttInstant, ttDateString, formatTTTime } from "../
 import { normalizeTTPhone, isValidEmail, cleanText } from "../lib/validation";
 import { initialPaymentStatus, orderPaymentMethod } from "../lib/payments";
 import { signSessionToken, verifySessionToken, hashAccessCode, verifyAccessCode, accessCodeProblem } from "../lib/server/crypto";
+import { buildOrderNotificationEmail } from "../lib/server/orderNotifications";
 
 const all = () => true;
+
+test("order notification emails include order details and escape customer content", () => {
+  const email = buildOrderNotificationEmail({
+    orderNumber: "CB-00123",
+    name: "Aden <script>",
+    phone: "868-555-1234",
+    customerEmail: "aden@example.com",
+    fulfilment: "pickup",
+    address: null,
+    deliveryArea: null,
+    scheduledDate: "2026-11-27",
+    total: 160,
+    paymentMethod: "cash_on_delivery",
+    notes: null,
+    lines: [{ name: "Shrimp & Snow Crab Mix", description: "Medium", quantity: 1, lineTotal: 160 }],
+  });
+  assert.match(email.subject, /CB-00123/);
+  assert.match(email.text, /Shrimp & Snow Crab Mix/);
+  assert.match(email.html, /Aden &lt;script&gt;/);
+  assert.doesNotMatch(email.html, /Aden <script>/);
+  assert.match(email.html, /Open Admin Dashboard/);
+});
 
 test("every catalogue id is unique and stable", () => {
   const ids = CATALOG.map(i => i.id);
