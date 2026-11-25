@@ -13,6 +13,7 @@ import { DELIVERY_AREAS, BLOCKED_DELIVERY_AREAS } from "../areas";
 import { db } from "./db";
 import { HttpError } from "./http";
 import { isOrderingOpen, type SchoolEventRow } from "./events";
+import { notificationFromOrderRow, type NewOrderNotification } from "./orderNotifications";
 
 export async function loadSettings(): Promise<SettingsMap> {
   const { data, error } = await db().from("settings").select("key, value");
@@ -32,6 +33,11 @@ export interface OrderReceipt {
   scheduledDate: string | null;
   lines: { name: string; description: string; quantity: number; lineTotal: number }[];
   duplicate: boolean;
+}
+
+export interface PlacedOrder {
+  receipt: OrderReceipt;
+  notification: NewOrderNotification | null;
 }
 
 const IDEMPOTENCY_RE = /^[A-Za-z0-9_-]{16,80}$/;
@@ -70,15 +76,15 @@ function priceOrThrow(lines: unknown, isAvailable: (i: CatalogItem) => boolean, 
   return { lines: priced.lines, subtotal: priced.subtotal, total };
 }
 
-async function insertOrder(row: Record<string, unknown>, idempotencyKey: string): Promise<OrderReceipt> {
+async function insertOrder(row: Record<string, unknown>, idempotencyKey: string): Promise<PlacedOrder> {
   const existing = await findByIdempotencyKey(idempotencyKey);
-  if (existing) return receiptFrom(existing, true);
+  if (existing) return { receipt: receiptFrom(existing, true), notification: null };
 
   const { data, error } = await db().from("orders").insert(row).select("*").single();
   if (error) {
     if (error.code === "23505") {
       const again = await findByIdempotencyKey(idempotencyKey);
-      if (again) return receiptFrom(again, true);
+      if (again) return { receipt: receiptFrom(again, true), notification: null };
     }
     const msg = error.message || "";
     if (msg.includes("SCHOOL_EVENT_CUTOFF_PASSED") || msg.includes("SCHOOL_EVENT_CLOSED")) {
@@ -87,7 +93,11 @@ async function insertOrder(row: Record<string, unknown>, idempotencyKey: string)
     console.error("[orders] insert failed", error.code);
     throw new HttpError(500, "Your order could not be saved. Please try again or WhatsApp 868-293-0570.");
   }
-  return receiptFrom(data as Record<string, unknown>, false);
+  const saved = data as Record<string, unknown>;
+  return {
+    receipt: receiptFrom(saved, false),
+    notification: notificationFromOrderRow(saved),
+  };
 }
 
 function customerFields(body: Record<string, unknown>, emailRequired: boolean) {
@@ -108,7 +118,7 @@ function heatFrom(value: unknown): string | null {
 }
 
 // ── Regular website orders ───────────────────────────────────────────────
-export async function placeRegularOrder(body: Record<string, unknown>): Promise<OrderReceipt> {
+export async function placeRegularOrder(body: Record<string, unknown>): Promise<PlacedOrder> {
   const settings = await loadSettings();
   if (settings.orders_open === "false") throw new HttpError(409, "Orders are currently closed.", "ORDERS_CLOSED");
 
@@ -168,7 +178,7 @@ export async function placeRegularOrder(body: Record<string, unknown>): Promise<
 }
 
 // ── School-event orders ──────────────────────────────────────────────────
-export async function placeEventOrder(ev: SchoolEventRow, body: Record<string, unknown>): Promise<OrderReceipt> {
+export async function placeEventOrder(ev: SchoolEventRow, body: Record<string, unknown>): Promise<PlacedOrder> {
   if (!isOrderingOpen(ev)) throw new HttpError(409, "Ordering for this event has closed.", "EVENT_CLOSED");
 
   const paymentMethod = body.paymentMethod as PaymentMethod;
