@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import {
-  SEAFOOD, DUO_SEAFOOD, EXTRAS, DUO_EXTRAS, ADDON_EXTRAS, HEATS, SOLO_OPTIONS, DUO_OPTIONS, SIMPLE_ITEMS,
+  SEAFOOD, DUO_SEAFOOD, ADDON_EXTRAS, HEATS, SOLO_OPTIONS, DUO_OPTIONS, SIMPLE_ITEMS,
   LOBSTER_PRODUCTS, BUILD_BASE, DELIVERY_FEE, type LineInput,
 } from "@/lib/menu";
 import { BANK_DETAILS } from "@/lib/payments";
@@ -86,10 +86,10 @@ export default function Home() {
   const [buildType,    setBuildType]    = useState<"solo" | "duo" | "">("");
   const [showDuoBuild, setShowDuoBuild] = useState(false);
   const [duoBuildSeafood, setDuoBuildSeafood] = useState<string[]>([]);
-  const [duoBuildExtras,  setDuoBuildExtras]  = useState<string[]>([]);
+  const [duoBuildAddons,  setDuoBuildAddons]  = useState<Record<string, number>>({});
   const [duoBuildHeat,    setDuoBuildHeat]    = useState<Heat>("");
   const [buildSeafood, setBuildSeafood] = useState<string[]>([]);
-  const [buildExtras,  setBuildExtras]  = useState<string[]>([]);
+  const [buildAddons,  setBuildAddons]  = useState<Record<string, number>>({});
   const [buildHeat,    setBuildHeat]    = useState<Heat>("");
   const [fulfillment, setFulfillment] = useState<"delivery" | "pickup" | "">("");
   const [paymentMethod,  setPaymentMethod]  = useState<"bank" | "cash" | "">("");
@@ -308,44 +308,51 @@ export default function Home() {
       return updated;
     });
   }
-  function calcBuildPrice(s: string[], e: string[]) {
+  function addonTotal(addons: Record<string, number>) {
+    return ADDON_EXTRAS.reduce((sum, item) => sum + (addons[item.id] || 0) * item.unitPrice, 0);
+  }
+  function calcBuildPrice(s: string[], addons: Record<string, number>) {
     return BASE
       + s.reduce((sum, id) => sum + (SEAFOOD.find(x => x.id === id)?.price ?? 0), 0)
-      + e.reduce((sum, id) => sum + (EXTRAS.find(x => x.id === id)?.price ?? 0), 0);
+      + addonTotal(addons);
   }
   function toggleBuildSeafood(id: string) { setBuildSeafood(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]); }
   function toggleDuoBuildSeafood(id: string) { setDuoBuildSeafood(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]); }
-  function toggleDuoBuildExtra(id: string)   { setDuoBuildExtras(prev  => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]); }
-  function toggleBuildExtra(id: string)   { setBuildExtras(prev  => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]); }
+  function setBuildAddonQty(id: string, qty: number) { setBuildAddons(prev => ({ ...prev, [id]: Math.max(0, Math.min(10, qty)) })); }
+  function setDuoBuildAddonQty(id: string, qty: number) { setDuoBuildAddons(prev => ({ ...prev, [id]: Math.max(0, Math.min(10, qty)) })); }
   const DUO_BASE = BUILD_BASE.duo;
 
-  function calcDuoBuildPrice(s: string[], e: string[]) {
+  function calcDuoBuildPrice(s: string[], addons: Record<string, number>) {
     return DUO_BASE
       + s.reduce((sum, id) => sum + (DUO_SEAFOOD.find(x => x.id === id)?.price ?? 0), 0)
-      + e.reduce((sum, id) => sum + (DUO_EXTRAS.find(x  => x.id === id)?.price ?? 0), 0);
+      + addonTotal(addons);
   }
 
   function addDuoBuildToCart() {
     if (duoBuildSeafood.length === 0) { alert("Please pick at least one seafood item."); return; }
     if (!duoBuildHeat) { alert("Please choose a heat level."); return; }
     const seafoodLabels = duoBuildSeafood.map(id => DUO_SEAFOOD.find(x => x.id === id)?.label).join(", ");
-    const extraLabels   = duoBuildExtras.map(id  => DUO_EXTRAS.find(x  => x.id === id)?.label).join(", ");
+    const activeExtras = ADDON_EXTRAS.filter(e => (duoBuildAddons[e.id] || 0) > 0)
+      .map(e => ({ id: e.id, label: e.label, desc: e.desc, qty: duoBuildAddons[e.id], unitPrice: e.unitPrice }));
+    const extraLabels = activeExtras.map(e => `${e.qty}x ${e.label} (${e.desc})`).join(", ");
     const heatLabel     = HEATS.find(h => h.id === duoBuildHeat)?.label ?? "";
     const desc = `${seafoodLabels}${extraLabels ? ` + ${extraLabels}` : ""} - ${heatLabel} (Duo)`;
-    addToCart({ id: `duo-build-${Date.now()}`, name: "Build Your Own Boil (Duo)", description: desc, price: calcDuoBuildPrice(duoBuildSeafood, duoBuildExtras),
-      line: { itemId: "build_duo", seafood: duoBuildSeafood, extras: duoBuildExtras, heat: duoBuildHeat } });
-    setDuoBuildSeafood([]); setDuoBuildExtras([]); setDuoBuildHeat(""); setShowDuoBuild(false);
+    addToCart({ id: `duo-build-${Date.now()}`, name: "Build Your Own Boil (Duo)", description: desc, price: calcDuoBuildPrice(duoBuildSeafood, duoBuildAddons), extras: activeExtras,
+      line: { itemId: "build_duo", seafood: duoBuildSeafood, addons: Object.fromEntries(activeExtras.map(e => [e.id, e.qty])), heat: duoBuildHeat } });
+    setDuoBuildSeafood([]); setDuoBuildAddons({}); setDuoBuildHeat(""); setShowDuoBuild(false);
   }
 
   function addBuildToCart() {
     if (buildSeafood.length === 0) { alert("Please pick at least one seafood item."); return; }
     if (!buildHeat) { alert("Please choose a heat level."); return; }
     const seafoodLabels = buildSeafood.map(id => SEAFOOD.find(x => x.id === id)?.label).join(", ");
-    const extraLabels   = buildExtras.map(id  => EXTRAS.find(x  => x.id === id)?.label).join(", ");
+    const activeExtras = ADDON_EXTRAS.filter(e => (buildAddons[e.id] || 0) > 0)
+      .map(e => ({ id: e.id, label: e.label, desc: e.desc, qty: buildAddons[e.id], unitPrice: e.unitPrice }));
+    const extraLabels = activeExtras.map(e => `${e.qty}x ${e.label} (${e.desc})`).join(", ");
     const heatLabel     = HEATS.find(h => h.id === buildHeat)?.label ?? "";
-    addToCart({ id: `build-${Date.now()}`, name: "Build Your Own Boil", description: `${seafoodLabels}${extraLabels ? ` + ${extraLabels}` : ""} - ${heatLabel}`, price: calcBuildPrice(buildSeafood, buildExtras),
-      line: { itemId: "build_solo", seafood: buildSeafood, extras: buildExtras, heat: buildHeat } });
-    setBuildSeafood([]); setBuildExtras([]); setBuildHeat(""); setShowBuild(false);
+    addToCart({ id: `build-${Date.now()}`, name: "Build Your Own Boil", description: `${seafoodLabels}${extraLabels ? ` + ${extraLabels}` : ""} - ${heatLabel}`, price: calcBuildPrice(buildSeafood, buildAddons), extras: activeExtras,
+      line: { itemId: "build_solo", seafood: buildSeafood, addons: Object.fromEntries(activeExtras.map(e => [e.id, e.qty])), heat: buildHeat } });
+    setBuildSeafood([]); setBuildAddons({}); setBuildHeat(""); setShowBuild(false);
   }
   function revealMenu() {
     setShowMenu(true);
@@ -987,16 +994,24 @@ export default function Home() {
                         </div>
                       </div>
                       <div>
-                        <p style={{ ...labelStyle, marginBottom: "12px", color: gold }}>Step 3 — Extras <span style={{ color: muted, fontWeight: "400", textTransform: "none" as const, letterSpacing: 0 }}>(optional)</span></p>
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: "8px" }}>
-                          {EXTRAS.map(item => (
-                            <button key={item.id} onClick={() => toggleBuildExtra(item.id)} style={toggleBtn(buildExtras.includes(item.id))}>
-                              <span style={{ fontSize: "24px", display: "block", marginBottom: "6px" }}>{item.emoji}</span>
-                              <span style={{ display: "block", fontWeight: "700", fontSize: "12px" }}>{item.label}</span>
-                              <span style={{ display: "block", color: muted, fontSize: "10px", marginTop: "2px" }}>{item.desc}</span>
-                              <span style={{ display: "block", color: gold, fontWeight: "700", fontSize: "13px", marginTop: "6px" }}>TT${item.price}</span>
-                            </button>
-                          ))}
+                        <p style={{ ...labelStyle, marginBottom: "12px", color: gold }}>Step 3 — Add Extras <span style={{ color: muted, fontWeight: "400", textTransform: "none" as const, letterSpacing: 0 }}>(optional · choose quantities)</span></p>
+                        <div style={{ display: "grid", gap: "8px" }}>
+                          {ADDON_EXTRAS.map(item => {
+                            const qty = buildAddons[item.id] || 0;
+                            return (
+                              <div key={item.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", padding: "12px 14px", border: qty > 0 ? `1px solid ${gold}` : `1px solid ${border}`, borderRadius: "6px", backgroundColor: qty > 0 ? goldDim : "transparent" }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
+                                  <span style={{ fontSize: "20px" }}>{item.emoji}</span>
+                                  <div><p style={{ fontSize: "13px", fontWeight: "600", color: charcoal }}>{item.label}</p><p style={{ fontSize: "11px", color: muted }}>{item.desc} · TT${item.unitPrice}</p></div>
+                                </div>
+                                <div style={{ display: "flex", alignItems: "center", gap: "7px", flexShrink: 0 }}>
+                                  <button onClick={() => setBuildAddonQty(item.id, qty - 1)} aria-label={`Remove ${item.label}`} style={{ width: "30px", height: "30px", borderRadius: "50%", border: `1px solid ${border}`, backgroundColor: qty > 0 ? gold : "transparent", color: qty > 0 ? white : muted, cursor: "pointer", fontSize: "17px" }}>−</button>
+                                  <span style={{ minWidth: "18px", textAlign: "center", fontWeight: "700", fontSize: "14px" }}>{qty}</span>
+                                  <button onClick={() => setBuildAddonQty(item.id, qty + 1)} aria-label={`Add ${item.label}`} style={{ width: "30px", height: "30px", borderRadius: "50%", border: `1px solid ${gold}`, backgroundColor: gold, color: white, cursor: "pointer", fontSize: "17px" }}>+</button>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                       <div>
@@ -1008,7 +1023,7 @@ export default function Home() {
                       <div style={{ backgroundColor: black, borderRadius: "4px", padding: "24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                         <div>
                           <p style={{ fontSize: "10px", fontWeight: "700", letterSpacing: "0.14em", textTransform: "uppercase" as const, color: muted, marginBottom: "6px" }}>Running Total</p>
-                          <p style={{ fontFamily: "'Cinzel', serif", fontSize: "32px", color: white }}>TT${calcBuildPrice(buildSeafood, buildExtras)}</p>
+                          <p style={{ fontFamily: "'Cinzel', serif", fontSize: "32px", color: white }}>TT${calcBuildPrice(buildSeafood, buildAddons)}</p>
                         </div>
                         <button onClick={addBuildToCart} style={goldBtn} className="gold-btn">Add to Cart</button>
                       </div>
@@ -1048,16 +1063,24 @@ export default function Home() {
                         </div>
                       </div>
                       <div>
-                        <p style={{ fontFamily: "'Inter', sans-serif", fontSize: "10px", fontWeight: "700", letterSpacing: "0.14em", textTransform: "uppercase" as const, color: gold, marginBottom: "12px" }}>Step 3 — Extras <span style={{ color: muted, fontWeight: "400", textTransform: "none" as const, letterSpacing: 0 }}>(optional, prices doubled)</span></p>
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: "8px" }}>
-                          {DUO_EXTRAS.map(item => (
-                            <button key={item.id} onClick={() => toggleDuoBuildExtra(item.id)} style={toggleBtn(duoBuildExtras.includes(item.id))}>
-                              <span style={{ fontSize: "24px", display: "block", marginBottom: "6px" }}>{item.emoji}</span>
-                              <span style={{ display: "block", fontWeight: "700", fontSize: "12px" }}>{item.label}</span>
-                              <span style={{ display: "block", color: muted, fontSize: "10px", marginTop: "2px" }}>{item.desc}</span>
-                              <span style={{ display: "block", color: gold, fontWeight: "700", fontSize: "13px", marginTop: "6px" }}>TT${item.price}</span>
-                            </button>
-                          ))}
+                        <p style={{ fontFamily: "'Inter', sans-serif", fontSize: "10px", fontWeight: "700", letterSpacing: "0.14em", textTransform: "uppercase" as const, color: gold, marginBottom: "12px" }}>Step 3 — Add Extras <span style={{ color: muted, fontWeight: "400", textTransform: "none" as const, letterSpacing: 0 }}>(optional · choose quantities)</span></p>
+                        <div style={{ display: "grid", gap: "8px" }}>
+                          {ADDON_EXTRAS.map(item => {
+                            const qty = duoBuildAddons[item.id] || 0;
+                            return (
+                              <div key={item.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", padding: "12px 14px", border: qty > 0 ? `1px solid ${gold}` : `1px solid ${border}`, borderRadius: "6px", backgroundColor: qty > 0 ? goldDim : "transparent" }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
+                                  <span style={{ fontSize: "20px" }}>{item.emoji}</span>
+                                  <div><p style={{ fontSize: "13px", fontWeight: "600", color: charcoal }}>{item.label}</p><p style={{ fontSize: "11px", color: muted }}>{item.desc} · TT${item.unitPrice}</p></div>
+                                </div>
+                                <div style={{ display: "flex", alignItems: "center", gap: "7px", flexShrink: 0 }}>
+                                  <button onClick={() => setDuoBuildAddonQty(item.id, qty - 1)} aria-label={`Remove ${item.label}`} style={{ width: "30px", height: "30px", borderRadius: "50%", border: `1px solid ${border}`, backgroundColor: qty > 0 ? gold : "transparent", color: qty > 0 ? white : muted, cursor: "pointer", fontSize: "17px" }}>−</button>
+                                  <span style={{ minWidth: "18px", textAlign: "center", fontWeight: "700", fontSize: "14px" }}>{qty}</span>
+                                  <button onClick={() => setDuoBuildAddonQty(item.id, qty + 1)} aria-label={`Add ${item.label}`} style={{ width: "30px", height: "30px", borderRadius: "50%", border: `1px solid ${gold}`, backgroundColor: gold, color: white, cursor: "pointer", fontSize: "17px" }}>+</button>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                       <div>
@@ -1077,7 +1100,7 @@ export default function Home() {
                       <div style={{ backgroundColor: black, borderRadius: "4px", padding: "24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                         <div>
                           <p style={{ fontSize: "10px", fontWeight: "700", letterSpacing: "0.14em", textTransform: "uppercase" as const, color: muted, marginBottom: "6px" }}>Total (Duo)</p>
-                          <p style={{ fontFamily: "'Cinzel', serif", fontSize: "32px", color: white }}>TT${calcDuoBuildPrice(duoBuildSeafood, duoBuildExtras)}</p>
+                          <p style={{ fontFamily: "'Cinzel', serif", fontSize: "32px", color: white }}>TT${calcDuoBuildPrice(duoBuildSeafood, duoBuildAddons)}</p>
                         </div>
                         <button onClick={addDuoBuildToCart} style={goldBtn} className="gold-btn">Add to Cart</button>
                       </div>

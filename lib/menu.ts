@@ -134,9 +134,9 @@ export const CATALOG: CatalogItem[] = [
       settingKey: `menu_${p.id}`, favKey: `fav_${p.id}`, allowsAddons: true, kind: "fixed" as const, size: "duo" as const },
   ])),
   { id: "build_solo", group: "build", name: "Build Your Own Boil",       description: "Solo - choose seafood, extras & heat", basePrice: BUILD_BASE.solo,
-    settingKey: "menu_build", favKey: "fav_build", allowsAddons: false, kind: "build", size: "solo" },
+    settingKey: "menu_build", favKey: "fav_build", allowsAddons: true, kind: "build", size: "solo" },
   { id: "build_duo",  group: "build", name: "Build Your Own Boil (Duo)", description: "Duo - choose seafood, extras & heat",  basePrice: BUILD_BASE.duo,
-    settingKey: "menu_build", favKey: "fav_build", allowsAddons: false, kind: "build", size: "duo" },
+    settingKey: "menu_build", favKey: "fav_build", allowsAddons: true, kind: "build", size: "duo" },
   ...SIMPLE_ITEMS.map(i => ({
     id: i.id, group: "more" as const, name: i.name, description: i.desc, basePrice: i.price,
     settingKey: `menu_${i.id}`, favKey: `fav_${i.id}`, allowsAddons: false, kind: "fixed" as const,
@@ -290,7 +290,11 @@ export function describeLine(
 ): string {
   if (item.kind === "build") {
     const heatLabel = HEATS.find(h => h.id === heat)?.label ?? "";
-    const base = `${seafood.map(s => s.label).join(", ")}${extras.length ? ` + ${extras.map(e => e.label).join(", ")}` : ""} - ${heatLabel}`;
+    const selectedExtras = [
+      ...extras.map(e => e.label),
+      ...addons.map(a => `${a.qty}x ${a.label} (${a.description})`),
+    ];
+    const base = `${seafood.map(s => s.label).join(", ")}${selectedExtras.length ? ` + ${selectedExtras.join(", ")}` : ""} - ${heatLabel}`;
     return item.size === "duo" ? `${base} (Duo)` : base;
   }
   return item.description + (addons.length ? " + " + addons.map(a => `${a.qty}x ${a.label} (${a.description})`).join(", ") : "");

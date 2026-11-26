@@ -67,6 +67,16 @@ test("build your own: seafood + extras + heat, duo prices", () => {
   assert.equal(priceCart([{ itemId: "build_solo", quantity: 1, seafood: ["lobster"], heat: "mild" }], all).ok, false);
 });
 
+test("build your own accepts quantity-based menu add-ons", () => {
+  const r = priceCart([{
+    itemId: "build_solo", quantity: 1, seafood: ["shrimp"], heat: "medium",
+    addons: { extra_mussels: 2, extra_sausage: 1, pepper_sauce: 1 },
+  }], all);
+  assert.ok(r.ok);
+  assert.equal(r.subtotal, 60 + 30 + 2 * 25 + 15 + 10);
+  assert.equal(r.lines[0].description, "Shrimp + 2x Extra Mussels (one portion (3-5 pieces)), 1x Extra Sausage (one portion), 1x Pepper Sauce (one serving) - Medium");
+});
+
 test("manipulated or unknown items, quantities and extras are rejected", () => {
   for (const cart of [
     [],
